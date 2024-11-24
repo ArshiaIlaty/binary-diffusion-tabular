@@ -6,26 +6,51 @@ from binary_diffusion_tabular import FixedSizeBinaryTableTransformation
 
 
 def create_sample_data():
-    """Create a sample DataFrame for testing."""
+    """Create a sample DataFrame for testing based on adult dataset."""
     data = {
-        'age': [25, 38, 28, 44, 18],
-        'fnlwgt': [226802, 89814, 336951, 160323, 103497],
-        'education-num': [7, 9, 10, 10, 9],
-        'capital-gain': [0, 0, 0, 7688, 0],
-        'capital-loss': [1, 2, 3, 4, 5],
-        'hours-per-week': [40, 50, 40, 40, 30],
-        'workclass': ['Private', 'Self-emp-not-inc', 'Private', 'Private', 'Private'],
-        'education': ['Bachelors', 'HS-grad', '11th', 'Masters', 'HS-grad'],
-        'marital-status': ['Never-married', 'Married-civ-spouse', 'Married-civ-spouse', 'Divorced', 'Never-married'],
-        'occupation': ['Tech-support', 'Craft-repair', 'Other-service', 'Sales', 'Adm-clerical'],
-        'relationship': ['Not-in-family', 'Husband', 'Husband', 'Unmarried', 'Not-in-family'],
-        'race': ['White', 'White', 'Asian-Pac-Islander', 'Black', 'White'],
-        'sex': ['Male', 'Male', 'Male', 'Male', 'Female'],
-        'native-country': ['United-States', 'United-States', 'United-States', 'United-States', 'United-States'],
-        'label': [1, 0, 1, 0, 1]
+        "age": [25, 38, 28, 44, 18],
+        "fnlwgt": [226802, 89814, 336951, 160323, 103497],
+        "education-num": [7, 9, 10, 10, 9],
+        "capital-gain": [0, 0, 0, 7688, 0],
+        "capital-loss": [1, 2, 3, 4, 5],
+        "hours-per-week": [40, 50, 40, 40, 30],
+        "workclass": ["Private", "Self-emp-not-inc", "Private", "Private", "Private"],
+        "education": ["Bachelors", "HS-grad", "11th", "Masters", "HS-grad"],
+        "marital-status": [
+            "Never-married",
+            "Married-civ-spouse",
+            "Married-civ-spouse",
+            "Divorced",
+            "Never-married",
+        ],
+        "occupation": [
+            "Tech-support",
+            "Craft-repair",
+            "Other-service",
+            "Sales",
+            "Adm-clerical",
+        ],
+        "relationship": [
+            "Not-in-family",
+            "Husband",
+            "Husband",
+            "Unmarried",
+            "Not-in-family",
+        ],
+        "race": ["White", "White", "Asian-Pac-Islander", "Black", "White"],
+        "sex": ["Male", "Male", "Male", "Male", "Female"],
+        "native-country": [
+            "United-States",
+            "United-States",
+            "United-States",
+            "United-States",
+            "United-States",
+        ],
+        "label": [1, 0, 1, 0, 1],
     }
     df = pd.DataFrame(data)
     return df
+
 
 class TestFixedSizeBinaryTableTransformation(unittest.TestCase):
     def setUp(self):
@@ -63,8 +88,12 @@ class TestFixedSizeBinaryTableTransformation(unittest.TestCase):
 
         x_binary, y_trans = self.transformation.fit_transform(df_x, df_y)
         x_binary_2, y_trans_2 = self.transformation.transform(df_x, df_y)
-        self.assertTrue(torch.all(x_binary == x_binary_2), "x_binary and x_binary_2 should be equal")
-        self.assertTrue(torch.all(y_trans == y_trans_2), "y_trans and y_trans_2 should be equal")
+        self.assertTrue(
+            torch.all(x_binary == x_binary_2), "x_binary and x_binary_2 should be equal"
+        )
+        self.assertTrue(
+            torch.all(y_trans == y_trans_2), "y_trans and y_trans_2 should be equal"
+        )
 
     def test_inverse_transform(self):
         """Test that inverse_transform accurately retrieves the original data."""
@@ -77,12 +106,18 @@ class TestFixedSizeBinaryTableTransformation(unittest.TestCase):
         for col in self.categorical_cols:
             original = self.df[col].reset_index(drop=True)
             back = df_x_back[col].reset_index(drop=True)
-            self.assertTrue(original.equals(back), f"Categorical column '{col}' does not match after inverse transform")
+            self.assertTrue(
+                original.equals(back),
+                f"Categorical column '{col}' does not match after inverse transform",
+            )
 
         for col in self.numerical_cols:
             original = self.df[col].values
             back = df_x_back[col].values
-            self.assertTrue(np.allclose(original, back, atol=1e-5), f"Numerical column '{col}' does not match after inverse transform")
+            self.assertTrue(
+                np.allclose(original, back, atol=1e-5),
+                f"Numerical column '{col}' does not match after inverse transform",
+            )
 
     def test_parallel_transformation(self):
         """Test that parallel and non-parallel transformations produce the same results."""
@@ -100,16 +135,22 @@ class TestFixedSizeBinaryTableTransformation(unittest.TestCase):
         )
         x_binary_p, y_trans_p = transformation_parallel.fit_transform(df_x, df_y)
 
-        self.assertTrue(torch.all(x_binary == x_binary_p), "Binary tensors should be equal when using parallel and non-parallel transforms")
-        self.assertTrue(torch.all(y_trans == y_trans_p), "Labels should be equal when using parallel and non-parallel transforms")
+        self.assertTrue(
+            torch.all(x_binary == x_binary_p),
+            "Binary tensors should be equal when using parallel and non-parallel transforms",
+        )
+        self.assertTrue(
+            torch.all(y_trans == y_trans_p),
+            "Labels should be equal when using parallel and non-parallel transforms",
+        )
 
     def test_invalid_numerical_dtype(self):
         """Test that a ValueError is raised when numerical columns have non-numeric types."""
         df_x = self.df.drop("label", axis=1).copy()
-        df_x['age'] = df_x['age'].astype(str)  # Introduce invalid dtype
+        df_x["age"] = df_x["age"].astype(str)  # Introduce invalid dtype
 
         with self.assertRaises(ValueError):
-            self.transformation.fit_transform(df_x, self.df['label'])
+            self.transformation.fit_transform(df_x, self.df["label"])
 
     def test_transform_without_fit(self):
         """Test that transforming without fitting raises a RuntimeError."""
@@ -140,7 +181,11 @@ class TestFixedSizeBinaryTableTransformation(unittest.TestCase):
         y_back = self.transformation.inverse_transform_label(y_trans)
 
         original_labels = df_y.values
-        self.assertTrue(np.array_equal(original_labels, y_back), "Original labels and inverse transformed labels should match")
+        self.assertTrue(
+            np.array_equal(original_labels, y_back),
+            "Original labels and inverse transformed labels should match",
+        )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

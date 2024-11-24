@@ -8,14 +8,14 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 import torch
 
+from binary_diffusion_tabular import TASK
+
 
 __all__ = [
     "FixedSizeBinaryTableTransformation",
 ]
 
 
-
-TASK = Literal["classification", "regression"]
 COLUMN_DTYPE = Literal["numerical", "categorical"]
 LABELS = Union[np.ndarray, pd.Series, torch.Tensor]
 
@@ -132,6 +132,7 @@ def pandas_row_to_tensor(row: pd.Series) -> torch.Tensor:
 
 
 class FixedSizeBinaryTableTransformation:
+    """Transformation to convert pandas dataframe to fixed size binary tensor and back"""
 
     def __init__(
         self,
@@ -144,7 +145,9 @@ class FixedSizeBinaryTableTransformation:
         self.numerical_columns = numerical_columns
         self.categorical_columns = categorical_columns
         self.parallel = parallel
-        self.label_encoder = LabelEncoder() if self.task == "classification" else MinMaxScaler()
+        self.label_encoder = (
+            LabelEncoder() if self.task == "classification" else MinMaxScaler()
+        )
 
         self.fitted = False
         self.fitted_label = False
@@ -154,13 +157,17 @@ class FixedSizeBinaryTableTransformation:
     @property
     def row_size(self) -> int:
         if not self.fitted:
-            raise RuntimeError("FixedSizeBinaryTableTransformation has not been fitted.")
+            raise RuntimeError(
+                "FixedSizeBinaryTableTransformation has not been fitted."
+            )
         return sum(self.size.values())
 
     @property
     def n_classes(self) -> int:
         if not self.fitted:
-            raise RuntimeError("FixedSizeBinaryTableTransformation has not been fitted.")
+            raise RuntimeError(
+                "FixedSizeBinaryTableTransformation has not been fitted."
+            )
 
         if self.task != "classification":
             raise ValueError("Task must be 'classification'.")
@@ -186,7 +193,9 @@ class FixedSizeBinaryTableTransformation:
         """
 
         if self.fitted:
-            raise RuntimeError("Transformation already fitted. Use transform() instead.")
+            raise RuntimeError(
+                "Transformation already fitted. Use transform() instead."
+            )
 
         x_binary, metadata, size = self._convert_df_to_fixed_size_binary_tensor(X)
         self.metadata = metadata
@@ -305,7 +314,9 @@ class FixedSizeBinaryTableTransformation:
         y_trans = self.label_encoder.inverse_transform(y.reshape(-1, 1))
         return y_trans
 
-    def _convert_fixed_size_binary_tensor_to_df(self, rows_binary: torch.Tensor) -> pd.DataFrame:
+    def _convert_fixed_size_binary_tensor_to_df(
+        self, rows_binary: torch.Tensor
+    ) -> pd.DataFrame:
         rows_np = rows_binary.detach().cpu().numpy().astype(int)
         rows_str = rows_np.astype(str)
 
@@ -356,59 +367,3 @@ class FixedSizeBinaryTableTransformation:
 
         rows_binary = torch.stack(rows_binary, dim=0)
         return rows_binary, metadata, size
-
-
-if __name__ == "__main__":
-
-    path_df = "/home/kinakh/Development/Projects/binary_ddpm/data/tabular/adult.csv"
-    df = pd.read_csv(path_df)
-
-    numerical_cols = [
-        "age",
-        "fnlwgt",
-        "education-num",
-        "capital-gain",
-        "capital-loss",
-        "hours-per-week",
-    ]
-
-    cat_cols = [
-        "workclass",
-        "education",
-        "marital-status",
-        "occupation",
-        "relationship",
-        "race",
-        "sex",
-        "native-country",
-    ]
-
-
-    transformation = FixedSizeBinaryTableTransformation(
-        task="classification",
-        numerical_columns=numerical_cols,
-        categorical_columns=cat_cols,
-        parallel=False,
-    )
-
-    df_y = df["label"]
-    df_x = df.drop("label", axis=1)
-
-    x_binary, y_trans = transformation.fit_transform(df_x, df_y)
-    x_binary_2, y_trans_2 = transformation.transform(df_x, df_y)
-
-    print(torch.all(x_binary == x_binary_2))
-    print(torch.all(y_trans == y_trans_2))
-
-    df_x_back, y_back = transformation.inverse_transform(
-        x_binary, y_trans
-    )
-
-    for col in cat_cols:
-        # check if column values are the same
-        check = df_x[col] == df_x_back[col]
-        print(col, all(check))
-
-    for col in numerical_cols:
-        check = np.allclose(df_x[col], df_x_back[col])
-        print(col, check)
