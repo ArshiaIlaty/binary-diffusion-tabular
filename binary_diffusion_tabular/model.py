@@ -62,6 +62,10 @@ class Residual(nn.Module):
 
 
 class SimpleTableGenerator(nn.Module):
+    """Simple denoiser model for table generation
+
+    Model works with 1d signals of fixed size"""
+
     def __init__(
         self,
         data_dim: int,
@@ -73,6 +77,18 @@ class SimpleTableGenerator(nn.Module):
         n_classes: int = 0,
         classifier_free_guidance: bool = False,
     ):
+        """
+        Args:
+            data_dim: dimension of data
+            dim: internal dimensionality
+            n_res_blocks: number of residual blocks
+            out_dim: number of output dimensions
+            task: task to generate data for. Options: classification, regression
+            conditional: if True, generative model is conditional
+            n_classes: number of classes for classification
+            classifier_free_guidance: if True, classifier free guidance is used during sampling
+        """
+
         if task not in ["classification", "regression"]:
             raise ValueError(f"Invalid task: {task}")
 
@@ -124,6 +140,19 @@ class SimpleTableGenerator(nn.Module):
         *args,
         **kwargs,
     ) -> torch.Tensor:
+        """Run denoising step for table generation
+
+        Args:
+            x: noisy input data (BS, data_dim)
+            t: timesteps (BS,)
+            y: conditional input data (BS,) or (BS, n_classes) if classifier free guidance
+            *args:
+            **kwargs:
+
+        Returns:
+            torch.Tensor: denoised data
+        """
+
         t = self.time_mlp(t)
 
         if y is not None and hasattr(self, "cond_emb"):
@@ -139,22 +168,3 @@ class SimpleTableGenerator(nn.Module):
         for block in self.blocks:
             x = block(x, t)
         return self.out(x)
-
-
-if __name__ == "__main__":
-    table_generator = SimpleTableGenerator(
-        data_dim=220,
-        dim=256,
-        n_res_blocks=3,
-        out_dim=220,
-        task="classification",
-        conditional=True,
-        n_classes=3,
-        classifier_free_guidance=False,
-    )
-
-    tensor = torch.randn((128, 220))
-    ts = torch.randint(0, 100, (128,)).float()
-    cls = torch.randint(0, 3, (128,))
-    out = table_generator(tensor, ts, cls)
-    print(out.shape)
