@@ -1,3 +1,4 @@
+from abc import ABC, abstractmethod
 from typing import Optional
 import math
 
@@ -7,7 +8,10 @@ from torch import nn
 from binary_diffusion_tabular import TASK
 
 
-__all__ = ["SimpleTableGenerator"]
+__all__ = [
+    "BaseModel",
+    "SimpleTableGenerator"
+]
 
 
 class SinusoidalPosEmb(nn.Module):
@@ -61,7 +65,27 @@ class Residual(nn.Module):
         return torch.cat([out, x], dim=1)
 
 
-class SimpleTableGenerator(nn.Module):
+class BaseModel(nn.Module, ABC):
+
+    def __init__(
+        self,
+        data_dim: int,
+        out_dim: int,
+    ):
+        super().__init__()
+        self.data_dim = data_dim
+        self.out_dim = out_dim
+
+    @abstractmethod
+    def forward(
+        self,
+        x: torch.Tensor,
+        t: torch.Tensor,
+    ) -> torch.Tensor:
+        pass
+
+
+class SimpleTableGenerator(BaseModel):
     """Simple denoiser model for table generation
 
     Model works with 1d signals of fixed size"""
@@ -95,7 +119,7 @@ class SimpleTableGenerator(nn.Module):
         if task == "classification" and conditional and n_classes <= 0:
             raise ValueError("n_classes must be greater than 0 for classification")
 
-        super(SimpleTableGenerator, self).__init__()
+        super(SimpleTableGenerator, self).__init__(data_dim, out_dim)
 
         self.n_classes = n_classes
         self.classifier_free_guidance = classifier_free_guidance
@@ -113,7 +137,7 @@ class SimpleTableGenerator(nn.Module):
         if self.task == "classification":
             if self.conditional:
                 if n_classes > 0:
-                    if classifier_free_guidance:
+                    if self.classifier_free_guidance:
                         self.class_emb = nn.Linear(n_classes, dim, bias=True)
                     else:
                         self.class_emb = nn.Embedding(n_classes, dim)
@@ -122,7 +146,7 @@ class SimpleTableGenerator(nn.Module):
                 # Regression task
                 self.cond_emb = nn.Linear(1, dim, bias=True)
 
-        self.data_proj = nn.Linear(data_dim, dim, bias=True)
+        self.data_proj = nn.Linear(self.data_dim, dim, bias=True)
 
         item = dim
         self.blocks = nn.ModuleList([])
@@ -130,7 +154,7 @@ class SimpleTableGenerator(nn.Module):
             self.blocks.append(Residual(dim, item, time_emb_dim=time_dim))
             dim += item
 
-        self.out = nn.Linear(dim, out_dim, bias=True)
+        self.out = nn.Linear(dim, self.out_dim, bias=True)
 
     def forward(
         self,

@@ -1,0 +1,444 @@
+from abc import ABC, abstractmethod
+from typing import Dict, Union, List, Optional, Literal, Any
+from pathlib import Path
+from collections import defaultdict
+
+import pandas as pd
+from tqdm.auto import tqdm
+
+import torch
+import torch.optim as optim
+from torch.utils.data import DataLoader
+import torch.nn.functional as F
+from accelerate import Accelerator
+from ema_pytorch import EMA
+
+from binary_diffusion_tabular.model import SimpleTableGenerator
+from binary_diffusion_tabular.diffusion import BaseDiffusion, BinaryDiffusion1D
+from binary_diffusion_tabular.dataset import FixedSizeBinaryTableDataset
+from binary_diffusion_tabular.utils import PathOrStr, exists, cycle, zero_out_randomly, get_base_model
+
+
+OPTIMIZERS = Literal["adam", "adamw"]
+
+
+class BaseTrainer(ABC):
+
+    """Base class for training."""
+
+    def __init__(
+        self,
+        *,
+        diffusion: BaseDiffusion,
+        train_num_steps: int = 200_000,
+        log_every: int = 100,
+        save_every: int = 10_000,
+        save_num_samples: int = 64,
+        max_grad_norm: Optional[float] = None,
+        gradient_accumulate_every: int = 1,
+        ema_decay: float = 0.995,
+        ema_update_every: int = 10,
+        lr: float = 3e-4,
+        opt_type: OPTIMIZERS,
+        opt_params: Dict[str, Any] = None,
+        batch_size: int = 256,
+        dataloader_workers: int = 16,
+        logger,
+        results_folder: PathOrStr,
+    ):
+        """
+        Args:
+            diffusion: diffusion model to train, should be a BaseDiffusion subclass
+            train_num_steps: number of training steps
+            log_every: logging frequency
+            save_every: saving generated samples frequency
+            save_num_samples: number of samples save
+            max_grad_norm: norm to clip gradients. Defaults to None, which means no clipping
+            gradient_accumulate_every: gradient accumulation frequency
+            ema_decay: decay factor for EMA updates
+            ema_update_every: ema update frequency
+            lr: learning rate
+            opt_type: optimizer type. Can be "adam" or "adamw"
+            opt_params: optimizer parameters. See each optimizer parameters
+            batch_size: batch size
+            dataloader_workers: number of dataloader workers
+            logger: wandb logger to use
+            results_folder: results folder, where to save samples and trained checkpoints
+        """
+
+        self.diffusion = diffusion
+
+        self.train_num_steps = train_num_steps
+        self.log_every = log_every
+        self.save_every = save_every
+        self.save_num_samples = save_num_samples
+        self.max_grad_norm = max_grad_norm
+        self.gradient_accumulate_every = gradient_accumulate_every
+        self.ema_decay = ema_decay
+        self.ema_update_every = ema_update_every
+        self.lr = lr
+        self.opt_type = opt_type
+        self.opt_params = {} if opt_params is None else opt_params
+        self.batch_size = batch_size
+        self.dataloader_workers = dataloader_workers
+        self.accelerator = Accelerator(
+            gradient_accumulation_steps=self.gradient_accumulate_every
+        )
+        self.device = self.accelerator.device
+        self.ema = EMA(self.diffusion, beta=self.ema_decay, update_every=self.ema_update_every).to(
+            self.device
+        )
+
+        self.opt = self._create_optimizer()
+
+        if self.accelerator.is_main_process:
+            self.results_folder = Path(results_folder)
+            self.results_folder.mkdir(exist_ok=True, parents=True)
+            self.logger = logger
+
+        self.step = 0
+
+    @classmethod
+    @abstractmethod
+    def from_config(cls, config: Dict[str, Any]) -> "BaseTrainer":
+        pass
+
+    @abstractmethod
+    def train(self) -> None:
+        pass
+
+    def load_checkpoint(self, path_checkpoint: PathOrStr) -> None:
+        ckpt = torch.load(path_checkpoint)
+
+        model = self.accelerator.unwrap_model(self.diffusion)
+        model.load_state_dict(ckpt["model"])
+
+        self.step = ckpt["step"]
+        self.opt.load_state_dict(ckpt["opt"])
+
+        try:
+            self.ema.load_state_dict(ckpt["ema"])
+        except:
+            for name, param in ckpt["ema"].items():
+                if name == "initted" or name == "step":
+                    ckpt["ema"][name] = param.unsqueeze(
+                        0
+                    )  # Convert from shape [] to [1]
+
+            # Load the adjusted state dict
+            self.ema.load_state_dict(ckpt["ema"])
+
+        if exists(self.accelerator.scaler) and exists(ckpt["scaler"]):
+            self.accelerator.scaler.load_state_dict(ckpt["scaler"])
+
+        self.diffusion, self.opt = self.accelerator.prepare(model, self.opt)
+        print(f"Loaded model from {path_checkpoint}")
+
+    def save_checkpoint(self, milestone) -> None:
+        if not self.accelerator.is_local_main_process:
+            return
+
+        config = {
+            "train_num_steps": self.train_num_steps,
+            "log_every": self.log_every,
+            "save_every": self.save_every,
+            "save_num_samples": self.save_num_samples,
+            "max_grad_norm": self.max_grad_norm,
+            "gradient_accumulate_every": self.gradient_accumulate_every,
+            "ema_decay": self.ema_decay,
+            "ema_update_every": self.ema_update_every,
+            "lr": self.lr,
+            "opt_type": self.opt_type,
+            "opt_params": self.opt_params,
+        }
+
+        data = {
+            "step": self.step,
+            "model": self.accelerator.get_state_dict(self.diffusion),
+            "opt": self.opt.state_dict(),
+            "ema": self.ema.state_dict(),
+            "scaler": self.accelerator.scaler.state_dict()
+            if exists(self.accelerator.scaler)
+            else None,
+            "config": config
+        }
+
+        torch.save(data, str(self.results_folder / f"model-{milestone}.pt"))
+
+    @abstractmethod
+    def sample_save_samples(self, milestone, *args, **kwargs) -> None:
+        pass
+
+    @abstractmethod
+    def _create_dataloader(self):
+        pass
+
+    def _create_optimizer(self):
+        if hasattr(self.diffusion, "model"):
+            params = self.diffusion.model.parameters()
+        else:
+            params = self.diffusion.parameters()
+
+        if self.opt_type == "adam":
+            opt = optim.Adam(params, lr=self.lr, **self.opt_params)
+        elif self.opt_type == "adamw":
+            opt = optim.AdamW(params, lr=self.lr, **self.opt_params)
+        else:
+            raise ValueError(f"Unknown optimizer type: {self.opt_type}")
+        return opt
+
+
+class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
+
+    def __init__(
+        self,
+        *,
+        diffusion: BinaryDiffusion1D,
+        dataset: FixedSizeBinaryTableDataset,
+        train_num_steps: int = 200_000,
+        log_every: int = 100,
+        save_every: int = 10_000,
+        save_num_samples: int = 64,
+        max_grad_norm: Optional[float] = None,
+        gradient_accumulate_every: int = 1,
+        ema_decay: float = 0.995,
+        ema_update_every: int = 10,
+        lr: float = 3e-4,
+        opt_type: OPTIMIZERS,
+        opt_params: Dict[str, Any] = None,
+        batch_size: int = 256,
+        dataloader_workers: int = 16,
+        zero_token_probability: float = 0.0,
+        logger,
+        results_folder: PathOrStr,
+    ):
+        if not (dataset.split_feature_target == diffusion.conditional):
+            raise RuntimeError("split_feature_target must be same as diffusion.conditional")
+
+        self.dataset = dataset
+        self.transformation = dataset.transformation
+        self.dataloader = cycle(self._create_dataloader())
+
+        if not (self.dataset.n_classes == self.diffusion.n_classes):
+            raise RuntimeError("dataset.n_classes must equal diffusion.n_classes")
+
+        self.conditional = diffusion.conditional
+        self.classifier_free_guidance = diffusion.classifier_free_guidance
+        self.n_classes = diffusion.n_classes
+        self.task = dataset.task
+
+        if self.classifier_free_guidance and zero_token_probability == 0:
+            raise ValueError("zero_token_probability must be non-zero when classifier_free_guidance is True")
+
+        self.zero_token_probability = zero_token_probability
+
+        super().__init__(
+            diffusion=diffusion,
+            train_num_steps=train_num_steps,
+            log_every=log_every,
+            save_every=save_every,
+            save_num_samples=save_num_samples,
+            max_grad_norm=max_grad_norm,
+            gradient_accumulate_every=gradient_accumulate_every,
+            ema_decay=ema_decay,
+            ema_update_every=ema_update_every,
+            lr=lr,
+            opt_type=opt_type,
+            opt_params=opt_params,
+            batch_size=batch_size,
+            dataloader_workers=dataloader_workers,
+            logger=logger,
+            results_folder=results_folder
+        )
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any]) -> "BaseTrainer":
+        config_data = config["data"]
+        config_model = config["model"]
+        config_diffusion = config["diffusion"]
+        config_trainer = config["trainer"]
+
+        path_table = config_data["path_table"]
+        table = pd.read_csv(path_table)
+
+        # drop path_table from config_data
+        del config_data["path_table"]
+
+        dataset = FixedSizeBinaryTableDataset(
+            table=table,
+            **config_data["dataset"],
+        )
+
+        classifier_free_guidance = config_trainer["classifier_free_guidance"]
+        diffusion_target = config_diffusion["target"]
+
+        model = SimpleTableGenerator(
+            data_dim=dataset.row_size,
+            out_dim=dataset.row_size * 2 if diffusion_target == "two_way" else dataset.row_size,
+            task=dataset.task,
+            conditional=dataset.conditional,
+            n_classes=dataset.n_classes,
+            classifier_free_guidance=classifier_free_guidance,
+            **config_model
+        )
+
+        diffusion = BinaryDiffusion1D(
+            denoise_model=model,
+            **config_diffusion,
+        )
+
+        return cls(
+            diffusion=diffusion,
+            dataset=dataset,
+            **config_trainer,
+        )
+
+    def train(self) -> None:
+        with tqdm(
+                initial=self.step,
+                total=self.train_num_steps,
+                disable=not self.accelerator.is_main_process,
+        ) as pbar:
+            while self.step < self.train_num_steps:
+                total_loss = defaultdict(float)
+                total_acc = defaultdict(float)
+
+                with self.accelerator.accumulate(self.diffusion):
+                    inp = next(self.dataloader)
+                    if self.conditional:
+                        data, label = inp
+                        label = self._preprocess_labels(label)
+                    else:
+                        data = inp
+                        label = None
+
+                    with self.accelerator.autocast():
+                        loss, losses, accs = self.diffusion(x=data, y=label)
+                        loss = loss / self.gradient_accumulate_every
+
+                        gathered_losses = {}
+                        gathered_accs = {}
+
+                        for key in losses:
+                            gathered_losses[key] = self.accelerator.gather(
+                                losses[key].detach()
+                            )
+
+                        for key in accs:
+                            gathered_accs[key] = self.accelerator.gather(
+                                accs[key].detach()
+                            )
+
+                    self.accelerator.wait_for_everyone()
+
+                    if self.max_grad_norm is not None:
+                        self.accelerator.clip_grad_norm_(
+                            self.diffusion.parameters(), self.max_grad_norm
+                        )
+
+                    self.accelerator.backward(loss)
+                    self.opt.step()
+                    self.opt.zero_grad()
+
+                if self.accelerator.is_main_process:
+                    message = f"Loss: {loss.item():.4f}"
+                    for key in gathered_accs:
+                        acc_val = torch.mean(gathered_accs[key]).item()
+                        total_acc[key] += acc_val
+                        message += f" | {key}: {acc_val:.4f}"
+
+                    for key in gathered_losses:
+                        loss_val = torch.mean(gathered_losses[key]).item()
+                        total_loss[key] += loss_val
+
+                    pbar.set_description(message)
+
+                    self.ema.update()
+                    if self.step % self.log_every == 0:
+                        log_dict = {}
+
+                        for key in total_loss:
+                            log_dict[key] = total_loss[key]
+
+                        for key in total_acc:
+                            log_dict[key] = total_acc[key]
+
+                        self.logger.log(log_dict)
+
+                    if self.step != 0 and self.step % self.save_every == 0:
+                        milestone = self.step // self.save_every
+                        self.sample_save_samples(milestone)
+                        self.accelerator.wait_for_everyone()
+                        self.save_checkpoint(milestone)
+
+                self.step += 1
+                pbar.update(1)
+
+        if self.accelerator.is_main_process:
+            self.sample_save_samples("final")
+            # save final model
+            self.accelerator.wait_for_everyone()
+            self.save_checkpoint("final")
+
+    @torch.inference_mode()
+    def sample_save_samples(self, milestone) -> None:
+        base_model = get_base_model(self.diffusion)
+        base_model.eval()
+        base_model_ema = get_base_model(self.ema.ema_model)
+        base_model_ema.eval()
+
+        with self.accelerator.autocast():
+            labels_val = self._get_random_validation_labels()
+
+            # sampling without
+            rows = base_model.sample(n=self.save_num_samples, y=labels_val)
+            rows_ema = base_model_ema.sample(n=self.save_num_samples, y=labels_val)
+
+        if self.conditional:
+            rows_df, labels_df = self.transformation.transform(rows, labels_val)
+            rows_ema_df, labels_ema_df = self.transformation.transform(rows_ema, labels_val)
+
+            rows_df[self.dataset.target_column] = labels_df
+            rows_ema_df[self.dataset.target_column] = labels_ema_df
+        else:
+            rows_df = self.transformation.transform(rows)
+            rows_ema_df = self.transformation.transform(rows_ema)
+
+        rows_df.to_csv(self.results_folder / f"samples_{milestone}.csv", index=False)
+        rows_ema_df.to_csv(self.results_folder / f"samples_{milestone}_ema.csv", index=False)
+
+    def _get_random_validation_labels(self) -> torch.Tensor | None:
+        if not self.conditional:
+            return None
+
+        if self.task == "classification":
+            labels_val = torch.randint(0, self.n_classes, (self.save_num_samples,), device=self.device)
+        else:
+            labels_val = torch.rand((self.save_num_samples, 1), device=self.device)
+
+        return labels_val
+
+    def _preprocess_labels(self, label: torch.Tensor) -> torch.Tensor:
+        if self.task == "regression":
+            label = label.unsqueeze(1)
+
+        if self.classifier_free_guidance:
+            if self.task == "classification":
+                label = F.one_hot(label, num_classes=self.n_classes).to(torch.float)
+                label = zero_out_randomly(label, self.zero_token_probability)
+            else:
+                # regression
+                # -1 is zero-token for regression
+                mask = torch.rand_like(label) < self.zero_token_probability
+                label[mask] = -1
+
+        return label
+
+    def _create_dataloader(self):
+        return DataLoader(
+            self.dataset,
+            batch_size=self.batch_size,
+            num_workers=self.dataloader_workers,
+            pin_memory=True,
+            shuffle=True,
+        )

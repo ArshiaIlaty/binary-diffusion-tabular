@@ -1,4 +1,5 @@
-from typing import Literal, Optional, Callable
+from abc import ABC, abstractmethod
+from typing import Literal, Optional, Callable, Dict, Tuple
 from functools import partial
 
 import torch
@@ -6,8 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchmetrics.functional import accuracy
 
+from binary_diffusion_tabular.model import BaseModel, SimpleTableGenerator
 
-__all__ = ["BinaryDiffusion1D"]
+
+__all__ = ["BinaryDiffusion1D", "BaseDiffusion"]
 
 
 SCHEDULE = Literal["linear", "quad", "sigmoid"]
@@ -73,16 +76,40 @@ def flip_values(val):
     return 1 - val
 
 
-class BinaryDiffusion1D(nn.Module):
+class BaseDiffusion(nn.Module, ABC):
+
+    def __init__(
+        self,
+        denoise_model: BaseModel,
+    ):
+        super().__init__()
+        self.model = denoise_model
+        self.device = next(self.model.parameters()).device
+
+    @abstractmethod
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, Dict, Dict]:
+        pass
+
+    @abstractmethod
+    def sample(
+        self,
+        *,
+        model_fn: Optional[Callable] = None,
+        y: Optional[torch.Tensor] = None,
+        n: int,
+    ) -> torch.Tensor:
+        pass
+
+
+class BinaryDiffusion1D(BaseDiffusion):
     """Binary Diffusion 1D model."""
 
     def __init__(
         self,
-        denoise_model: nn.Module,
+        denoise_model: SimpleTableGenerator,
         *,
         schedule: SCHEDULE = "linear",
         n_timesteps: int,
-        size: int,
         target: DENOISING_TARGET = "mask",
     ):
         """
@@ -95,24 +122,38 @@ class BinaryDiffusion1D(nn.Module):
                     two_way: predict both mask and denoiser target
         """
 
-        super(BinaryDiffusion1D, self).__init__()
+        super().__init__(denoise_model)
+        self.size = denoise_model.data_dim
+
         if target not in ["mask", "target", "two_way"]:
             raise ValueError("Incorrect target type")
 
-        self.size = size
+        if target == "two_way" and self.model.out_dim != 2 * self.size:
+            raise ValueError("Incorrect target size. For `two_way` diffusion output should be 2*size")
+
         self.target = target
 
-        self.model = denoise_model
-        self.device = next(self.model.parameters()).device
         self.n_timesteps = n_timesteps
         self.schedule = schedule
 
         self.loss = F.binary_cross_entropy_with_logits
-        self.betas = make_beta_schedule(schedule, n_timesteps, start=1 / size).to(
+        self.betas = make_beta_schedule(schedule, n_timesteps, start=1 / self.size).to(
             self.device
         )
         self.flip_values = flip_values
         self.pred_postproc = torch.sigmoid
+
+    @property
+    def conditional(self) -> bool:
+        return self.model.conditional
+
+    @property
+    def classifier_free_guidance(self) -> bool:
+        return self.model.classifier_free_guidance
+
+    @property
+    def n_classes(self) -> int:
+        return self.model.n_classes
 
     def q_sample(
         self, x_0: torch.Tensor, t: torch.Tensor, mask: Optional[torch.Tensor] = None
@@ -247,7 +288,7 @@ class BinaryDiffusion1D(nn.Module):
         )
         return x
 
-    def forward(self, x: torch.Tensor, *args, **kwargs):
+    def forward(self, x: torch.Tensor, y: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict, Dict]:
         """Runs binary diffusion model training step
 
         Model selects random timesteps, adds binary noise to data samples, runs denoiser and computed losses and
@@ -255,6 +296,8 @@ class BinaryDiffusion1D(nn.Module):
 
         Args:
             x: input data. Shape (BS, data_dim)
+
+            y: optional conditioning. Shape (BS, ...)
 
         Returns:
             torch.Tensor, Dict, Dict: training loss, losses to log, accuracies to log
@@ -271,7 +314,7 @@ class BinaryDiffusion1D(nn.Module):
         mask = get_mask_torch(beta, sample_shape, self.device)
 
         x_t = self.q_sample(x, t, mask)
-        pred = self.model(x_t, t, *args, **kwargs)
+        pred = self.model(x_t, t, y=y)
 
         if self.target == "mask":
             loss = self.loss(pred, mask.float())
