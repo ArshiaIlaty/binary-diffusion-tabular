@@ -129,7 +129,9 @@ class BinaryDiffusion1D(BaseDiffusion):
             raise ValueError("Incorrect target type")
 
         if target == "two_way" and self.model.out_dim != 2 * self.size:
-            raise ValueError("Incorrect target size. For `two_way` diffusion output should be 2*size")
+            raise ValueError(
+                "Incorrect target size. For `two_way` diffusion output should be 2*size"
+            )
 
         self.target = target
 
@@ -288,7 +290,9 @@ class BinaryDiffusion1D(BaseDiffusion):
         )
         return x
 
-    def forward(self, x: torch.Tensor, y: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict, Dict]:
+    def forward(
+        self, x: torch.Tensor, y: Optional[torch.Tensor] = None
+    ) -> Tuple[torch.Tensor, Dict, Dict]:
         """Runs binary diffusion model training step
 
         Model selects random timesteps, adds binary noise to data samples, runs denoiser and computed losses and

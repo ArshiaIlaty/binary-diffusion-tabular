@@ -8,10 +8,7 @@ from torch import nn
 from binary_diffusion_tabular import TASK
 
 
-__all__ = [
-    "BaseModel",
-    "SimpleTableGenerator"
-]
+__all__ = ["BaseModel", "SimpleTableGenerator"]
 
 
 class SinusoidalPosEmb(nn.Module):

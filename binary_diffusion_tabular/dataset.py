@@ -5,11 +5,13 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from binary_diffusion_tabular.transformation import FixedSizeBinaryTableTransformation, TASK
+from binary_diffusion_tabular.transformation import (
+    FixedSizeBinaryTableTransformation,
+    TASK,
+)
 
 
 class FixedSizeBinaryTableDataset(Dataset):
-
     """Pytorch dataset for fixed size binary tables."""
 
     def __init__(
@@ -45,13 +47,17 @@ class FixedSizeBinaryTableDataset(Dataset):
         self.numerical_columns = numerical_columns
         self.categorical_columns = categorical_columns
 
-        self.transformation = FixedSizeBinaryTableTransformation(task, numerical_columns, categorical_columns)
+        self.transformation = FixedSizeBinaryTableTransformation(
+            task, numerical_columns, categorical_columns
+        )
 
         if self.split_feature_target:
             target = self.table[self.target_column]
             features = self.table.drop(columns=[self.target_column])
 
-            self.features_binary, self.targets_binary = self.transformation.fit_transform(features, target)
+            self.features_binary, self.targets_binary = (
+                self.transformation.fit_transform(features, target)
+            )
         else:
             self.features_binary = self.transformation.fit_transform(self.table)
 
@@ -70,7 +76,9 @@ class FixedSizeBinaryTableDataset(Dataset):
     def __len__(self) -> int:
         return len(self.features_binary)
 
-    def __getitem__(self, idx: int) -> Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
+    def __getitem__(
+        self, idx: int
+    ) -> Union[Tuple[torch.Tensor, torch.Tensor], torch.Tensor]:
         row = self.features_binary[idx]
 
         if self.split_feature_target:

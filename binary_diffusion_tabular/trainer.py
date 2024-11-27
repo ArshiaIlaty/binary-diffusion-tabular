@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Union, List, Optional, Literal, Any
+from typing import Dict, Optional, Literal, Any
 from pathlib import Path
 from collections import defaultdict
 
@@ -16,14 +16,23 @@ from ema_pytorch import EMA
 from binary_diffusion_tabular.model import SimpleTableGenerator
 from binary_diffusion_tabular.diffusion import BaseDiffusion, BinaryDiffusion1D
 from binary_diffusion_tabular.dataset import FixedSizeBinaryTableDataset
-from binary_diffusion_tabular.utils import PathOrStr, exists, cycle, zero_out_randomly, get_base_model
+from binary_diffusion_tabular.utils import (
+    PathOrStr,
+    exists,
+    cycle,
+    zero_out_randomly,
+    get_base_model,
+    drop_fill_na
+)
+
+
+__all__ = ["BaseTrainer", "FixedSizeTableBinaryDiffusionTrainer"]
 
 
 OPTIMIZERS = Literal["adam", "adamw"]
 
 
 class BaseTrainer(ABC):
-
     """Base class for training."""
 
     def __init__(
@@ -49,19 +58,19 @@ class BaseTrainer(ABC):
         """
         Args:
             diffusion: diffusion model to train, should be a BaseDiffusion subclass
-            train_num_steps: number of training steps
-            log_every: logging frequency
-            save_every: saving generated samples frequency
-            save_num_samples: number of samples save
+            train_num_steps: number of training steps. Default is 200000
+            log_every: log every n steps. Default is 100
+            save_every: saving generated samples frequency. Default is 10000
+            save_num_samples: number of samples save. Default is 64
             max_grad_norm: norm to clip gradients. Defaults to None, which means no clipping
-            gradient_accumulate_every: gradient accumulation frequency
-            ema_decay: decay factor for EMA updates
-            ema_update_every: ema update frequency
-            lr: learning rate
+            gradient_accumulate_every: gradient accumulation frequency. Defaults to 1
+            ema_decay: decay factor for EMA updates. Defaults to 0.995
+            ema_update_every: ema update frequency. Defaults to 10
+            lr: learning rate. Defaults to 3e-4
             opt_type: optimizer type. Can be "adam" or "adamw"
             opt_params: optimizer parameters. See each optimizer parameters
-            batch_size: batch size
-            dataloader_workers: number of dataloader workers
+            batch_size: batch size. Defaults to 256
+            dataloader_workers: number of dataloader workers. Defaults to 16
             logger: wandb logger to use
             results_folder: results folder, where to save samples and trained checkpoints
         """
@@ -85,9 +94,9 @@ class BaseTrainer(ABC):
             gradient_accumulation_steps=self.gradient_accumulate_every
         )
         self.device = self.accelerator.device
-        self.ema = EMA(self.diffusion, beta=self.ema_decay, update_every=self.ema_update_every).to(
-            self.device
-        )
+        self.ema = EMA(
+            self.diffusion, beta=self.ema_decay, update_every=self.ema_update_every
+        ).to(self.device)
 
         self.opt = self._create_optimizer()
 
@@ -157,10 +166,12 @@ class BaseTrainer(ABC):
             "model": self.accelerator.get_state_dict(self.diffusion),
             "opt": self.opt.state_dict(),
             "ema": self.ema.state_dict(),
-            "scaler": self.accelerator.scaler.state_dict()
-            if exists(self.accelerator.scaler)
-            else None,
-            "config": config
+            "scaler": (
+                self.accelerator.scaler.state_dict()
+                if exists(self.accelerator.scaler)
+                else None
+            ),
+            "config": config,
         }
 
         torch.save(data, str(self.results_folder / f"model-{milestone}.pt"))
@@ -190,6 +201,8 @@ class BaseTrainer(ABC):
 
 class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
+    """Trainer for binary diffusion"""
+
     def __init__(
         self,
         *,
@@ -208,12 +221,48 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         opt_params: Dict[str, Any] = None,
         batch_size: int = 256,
         dataloader_workers: int = 16,
+        classifier_free_guidance: bool,
         zero_token_probability: float = 0.0,
         logger,
         results_folder: PathOrStr,
     ):
+        """
+        Args:
+            diffusion: diffusion model to train, should be a BinaryDiffusion1D
+            dataset: dataset to train on, should be a FixedSizeBinaryTableDataset
+            train_num_steps: number of training steps. Default is 200000
+            log_every: log every n steps. Default is 100
+            save_every: saving generated samples frequency. Default is 10000
+            save_num_samples: number of samples save. Default is 64
+            max_grad_norm: norm to clip gradients. Defaults to None, which means no clipping
+            gradient_accumulate_every: gradient accumulation frequency. Defaults to 1
+            ema_decay: decay factor for EMA updates. Defaults to 0.995
+            ema_update_every: ema update frequency. Defaults to 10
+            lr: learning rate. Defaults to 3e-4
+            opt_type: optimizer type. Can be "adam" or "adamw"
+            opt_params: optimizer parameters. See each optimizer parameters
+            batch_size: batch size. Defaults to 256
+            dataloader_workers: number of dataloader workers. Defaults to 16
+            classifier_free_guidance: if True classifier free guidance is applied, when training
+            zero_token_probability: zero token probability for classifier free guidance training. Defaults to 0.0
+            logger: wandb logger to use
+            results_folder: results folder, where to save samples and trained checkpoints
+        """
+
         if not (dataset.split_feature_target == diffusion.conditional):
-            raise RuntimeError("split_feature_target must be same as diffusion.conditional")
+            raise ValueError(
+                "split_feature_target must be same as diffusion.conditional"
+            )
+
+        if classifier_free_guidance and zero_token_probability == 0:
+            raise ValueError(
+                "zero_token_probability must be non-zero when classifier_free_guidance is True"
+            )
+
+        if not (diffusion.classifier_free_guidance == classifier_free_guidance):
+            raise ValueError(
+                "classifier_free_guidance must be same as diffusion.classifier_free_guidance"
+            )
 
         self.dataset = dataset
         self.transformation = dataset.transformation
@@ -223,13 +272,9 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             raise RuntimeError("dataset.n_classes must equal diffusion.n_classes")
 
         self.conditional = diffusion.conditional
-        self.classifier_free_guidance = diffusion.classifier_free_guidance
+        self.classifier_free_guidance = classifier_free_guidance
         self.n_classes = diffusion.n_classes
         self.task = dataset.task
-
-        if self.classifier_free_guidance and zero_token_probability == 0:
-            raise ValueError("zero_token_probability must be non-zero when classifier_free_guidance is True")
-
         self.zero_token_probability = zero_token_probability
 
         super().__init__(
@@ -248,24 +293,85 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             batch_size=batch_size,
             dataloader_workers=dataloader_workers,
             logger=logger,
-            results_folder=results_folder
+            results_folder=results_folder,
         )
 
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "BaseTrainer":
+    def from_config(cls, config: Dict[str, Any]) -> "FixedSizeTableBinaryDiffusionTrainer":
+        """Builds trainer, model, diffusion and dataset from config.
+
+        Config should have the following structure:
+
+        data:
+           path_table: path to the csv file with table data
+           columns_numerical: list of numerical column names
+           columns_categorical: list of categorical column names
+           columns_to_drop: list of column names to drop
+           dropna: if True, will drop columns with NaNs
+           fillna: if True, will fill NaNs. Numerical replaced with mean, categorical replaced with mode
+           target_column: optional target column name, should be provided for conditional training
+           split_feature_target: if True, will split the feature target into training and test sets, should be True for conditional training
+           task: task for which dataset is used. Options: classification, regression
+
+        model:
+           dim: internal dimension of model
+           n_res_blocks: number of residual blocks to use
+
+           other parameters are filled from dataset
+
+        diffusion:
+           schedule: noise schedule for diffusion. Options: linear, quad, sigmoid
+           n_timesteps: number of diffusion steps
+           target: target for diffusion. Options: mask, target, two_way
+
+        trainer:
+           train_num_steps: number of training steps
+           log_every: log every n steps
+           save_every: saving generated samples frequency
+           save_num_samples: number of samples save
+           max_grad_norm: norm to clip gradients. If None, no clipping
+           gradient_accumulate_every: gradient accumulation frequency
+           ema_decay: decay factor for EMA updates
+           ema_update_every: ema update frequency
+           lr: learning rate
+           opt_type: optimizer type. Can be "adam" or "adamw"
+           opt_params: optimizer parameters. See each optimizer parameters
+           batch_size: batch size
+           dataloader_workers: number of dataloader workers
+           classifier_free_guidance: if True classifier free guidance is applied, when training
+           zero_token_probability: zero token probability for classifier free guidance training
+           results_folder: results folder, where to save samples and trained checkpoints
+
+        Args:
+            config: config with parameters for dataset, denoising model, diffusion and trainer
+
+        Returns:
+            FixedSizeTableBinaryDiffusionTrainer: trainer
+        """
+
         config_data = config["data"]
         config_model = config["model"]
         config_diffusion = config["diffusion"]
         config_trainer = config["trainer"]
 
         path_table = config_data["path_table"]
-        table = pd.read_csv(path_table)
+        df = pd.read_csv(path_table)
+        dropna = config_data["dropna"]
+        fillna = config_data["fillna"]
+        columns_numerical = config_data["columns_numerical"]
+        columns_categorical = config_data["columns_categorical"]
+        columns_to_drop = config_data["columns_to_drop"]
+        df = df.drop(columns=columns_to_drop)
+        df = drop_fill_na(df, columns_numerical, columns_categorical, dropna, fillna)
 
-        # drop path_table from config_data
+        # drop from config_data
         del config_data["path_table"]
+        del config_data["dropna"]
+        del config_data["fillna"]
+        del config_data["columns_to_drop"]
 
         dataset = FixedSizeBinaryTableDataset(
-            table=table,
+            table=df,
             **config_data["dataset"],
         )
 
@@ -274,12 +380,16 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
         model = SimpleTableGenerator(
             data_dim=dataset.row_size,
-            out_dim=dataset.row_size * 2 if diffusion_target == "two_way" else dataset.row_size,
+            out_dim=(
+                dataset.row_size * 2
+                if diffusion_target == "two_way"
+                else dataset.row_size
+            ),
             task=dataset.task,
             conditional=dataset.conditional,
             n_classes=dataset.n_classes,
             classifier_free_guidance=classifier_free_guidance,
-            **config_model
+            **config_model,
         )
 
         diffusion = BinaryDiffusion1D(
@@ -287,6 +397,7 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             **config_diffusion,
         )
 
+        # todo: implement logger
         return cls(
             diffusion=diffusion,
             dataset=dataset,
@@ -295,9 +406,9 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
     def train(self) -> None:
         with tqdm(
-                initial=self.step,
-                total=self.train_num_steps,
-                disable=not self.accelerator.is_main_process,
+            initial=self.step,
+            total=self.train_num_steps,
+            disable=not self.accelerator.is_main_process,
         ) as pbar:
             while self.step < self.train_num_steps:
                 total_loss = defaultdict(float)
@@ -396,7 +507,9 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
         if self.conditional:
             rows_df, labels_df = self.transformation.transform(rows, labels_val)
-            rows_ema_df, labels_ema_df = self.transformation.transform(rows_ema, labels_val)
+            rows_ema_df, labels_ema_df = self.transformation.transform(
+                rows_ema, labels_val
+            )
 
             rows_df[self.dataset.target_column] = labels_df
             rows_ema_df[self.dataset.target_column] = labels_ema_df
@@ -405,14 +518,18 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             rows_ema_df = self.transformation.transform(rows_ema)
 
         rows_df.to_csv(self.results_folder / f"samples_{milestone}.csv", index=False)
-        rows_ema_df.to_csv(self.results_folder / f"samples_{milestone}_ema.csv", index=False)
+        rows_ema_df.to_csv(
+            self.results_folder / f"samples_{milestone}_ema.csv", index=False
+        )
 
     def _get_random_validation_labels(self) -> torch.Tensor | None:
         if not self.conditional:
             return None
 
         if self.task == "classification":
-            labels_val = torch.randint(0, self.n_classes, (self.save_num_samples,), device=self.device)
+            labels_val = torch.randint(
+                0, self.n_classes, (self.save_num_samples,), device=self.device
+            )
         else:
             labels_val = torch.rand((self.save_num_samples, 1), device=self.device)
 
@@ -434,7 +551,7 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
         return label
 
-    def _create_dataloader(self):
+    def _create_dataloader(self) -> DataLoader:
         return DataLoader(
             self.dataset,
             batch_size=self.batch_size,
