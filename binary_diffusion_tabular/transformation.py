@@ -204,7 +204,7 @@ class FixedSizeBinaryTableTransformation:
         self.fitted = True
 
         if y is not None:
-            y_trans = self.label_encoder.fit_transform(y)
+            y_trans = self.fit_transform_label(y)
             self.fitted_label = True
             y_trans = torch.tensor(y_trans, dtype=torch.float)
             return x_binary, y_trans
@@ -237,6 +237,27 @@ class FixedSizeBinaryTableTransformation:
             return x_binary, y_trans
 
         return x_binary
+
+    def fit_transform_label(self, y: LABELS) -> torch.Tensor:
+        """Fits encoder for labels and transforms the labels
+
+        Args:
+            y: labels to transform. Can be np.ndarray, pd.Series.
+
+        Returns:
+            torch.Tensor: transformed labels
+        """
+
+        if isinstance(y, pd.Series):
+            y = y.values
+        elif isinstance(y, torch.Tensor):
+            y = y.detach().cpu().numpy()
+
+        y_trans = self.label_encoder.fit_transform(y.reshape(-1, 1))
+        y_trans = torch.tensor(y_trans, dtype=torch.float)
+
+        self.fitted_label = True
+        return y_trans
 
     def transform_label(self, y: LABELS) -> torch.Tensor:
         """Transforms the labels

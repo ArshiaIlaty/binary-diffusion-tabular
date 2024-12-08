@@ -1,5 +1,6 @@
-from typing import Literal, Union, List
+from typing import Literal, Union, List, Dict
 from pathlib import Path
+import yaml
 
 import pandas as pd
 
@@ -14,7 +15,9 @@ __all__ = [
     "cycle",
     "zero_out_randomly",
     "get_base_model",
-    "drop_fill_na"
+    "drop_fill_na",
+    "get_config",
+    "save_config",
 ]
 
 
@@ -100,3 +103,23 @@ def drop_fill_na(
             df[col] = df[col].fillna(df[col].mode()[0])
 
     return df
+
+
+def get_config(config):
+    with open(config, "r") as stream:
+        return yaml.load(stream, Loader=yaml.FullLoader)
+
+
+def save_config(config: Dict, yaml_file_path: PathOrStr) -> None:
+    """save config to yaml file
+
+    Args:
+        config: config to save
+        yaml_file_path: path to yaml file
+    """
+
+    try:
+        with open(yaml_file_path, "w") as file:
+            yaml.dump(config, file, sort_keys=False, default_flow_style=False)
+    except Exception as e:
+        print(f"Error saving dictionary to YAML file: {e}")

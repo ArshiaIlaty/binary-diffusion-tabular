@@ -10,7 +10,16 @@ from torchmetrics.functional import accuracy
 from binary_diffusion_tabular.model import BaseModel, SimpleTableGenerator
 
 
-__all__ = ["BinaryDiffusion1D", "BaseDiffusion"]
+__all__ = [
+    "BinaryDiffusion1D",
+    "BaseDiffusion",
+    "SCHEDULE",
+    "DENOISING_TARGET",
+    "SAMPLING_STRATEGY",
+    "make_beta_schedule",
+    "get_mask_torch",
+    "flip_values",
+]
 
 
 SCHEDULE = Literal["linear", "quad", "sigmoid"]
@@ -163,9 +172,9 @@ class BinaryDiffusion1D(BaseDiffusion):
         if mask is None:
             shape = x_0.shape
             beta = torch.tensor([self.betas[t]] * shape[0]).to(self.device)
-            mask = get_mask_torch(beta, shape[1:])
-        mask = mask.to(bool)
-        x_copy = x_0.clone()
+            mask = get_mask_torch(beta, shape[1:]).to(self.device)
+        mask = mask.to(bool).to(self.device)
+        x_copy = x_0.clone().to(self.device)
         x_copy[mask] = self.flip_values(x_copy[mask])
         return x_copy
 

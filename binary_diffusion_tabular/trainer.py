@@ -3,6 +3,7 @@ from typing import Dict, Optional, Literal, Any
 from pathlib import Path
 from collections import defaultdict
 
+import accelerate
 import pandas as pd
 from tqdm.auto import tqdm
 
@@ -12,6 +13,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from accelerate import Accelerator
 from ema_pytorch import EMA
+import wandb
 
 from binary_diffusion_tabular.model import SimpleTableGenerator
 from binary_diffusion_tabular.diffusion import BaseDiffusion, BinaryDiffusion1D
@@ -22,7 +24,8 @@ from binary_diffusion_tabular.utils import (
     cycle,
     zero_out_randomly,
     get_base_model,
-    drop_fill_na
+    drop_fill_na,
+    save_config,
 )
 
 
@@ -200,7 +203,6 @@ class BaseTrainer(ABC):
 
 
 class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
-
     """Trainer for binary diffusion"""
 
     def __init__(
@@ -263,14 +265,6 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             raise ValueError(
                 "classifier_free_guidance must be same as diffusion.classifier_free_guidance"
             )
-
-        self.dataset = dataset
-        self.transformation = dataset.transformation
-        self.dataloader = cycle(self._create_dataloader())
-
-        if not (self.dataset.n_classes == self.diffusion.n_classes):
-            raise RuntimeError("dataset.n_classes must equal diffusion.n_classes")
-
         self.conditional = diffusion.conditional
         self.classifier_free_guidance = classifier_free_guidance
         self.n_classes = diffusion.n_classes
@@ -296,16 +290,28 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             results_folder=results_folder,
         )
 
+        self.dataset = dataset
+        self.transformation = dataset.transformation
+        self.dataloader = self.accelerator.prepare(self._create_dataloader())
+        self.dataloader = cycle(self.dataloader)
+
+        if self.task == "classification" and not (
+            self.dataset.n_classes == self.diffusion.n_classes
+        ):
+            raise RuntimeError("dataset.n_classes must equal diffusion.n_classes")
+
     @classmethod
-    def from_config(cls, config: Dict[str, Any]) -> "FixedSizeTableBinaryDiffusionTrainer":
+    def from_config(
+        cls, config: Dict[str, Any], logger
+    ) -> "FixedSizeTableBinaryDiffusionTrainer":
         """Builds trainer, model, diffusion and dataset from config.
 
         Config should have the following structure:
 
         data:
            path_table: path to the csv file with table data
-           columns_numerical: list of numerical column names
-           columns_categorical: list of categorical column names
+           numerical_columns: list of numerical column names
+           categorical_columns: list of categorical column names
            columns_to_drop: list of column names to drop
            dropna: if True, will drop columns with NaNs
            fillna: if True, will fill NaNs. Numerical replaced with mean, categorical replaced with mode
@@ -340,10 +346,12 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
            dataloader_workers: number of dataloader workers
            classifier_free_guidance: if True classifier free guidance is applied, when training
            zero_token_probability: zero token probability for classifier free guidance training
-           results_folder: results folder, where to save samples and trained checkpoints
+
+        comment: <comment how to name results folder>
 
         Args:
             config: config with parameters for dataset, denoising model, diffusion and trainer
+            logger: wandb logger. Create by `wandb.init(project=<project name>)`
 
         Returns:
             FixedSizeTableBinaryDiffusionTrainer: trainer
@@ -358,10 +366,13 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         df = pd.read_csv(path_table)
         dropna = config_data["dropna"]
         fillna = config_data["fillna"]
-        columns_numerical = config_data["columns_numerical"]
-        columns_categorical = config_data["columns_categorical"]
+        columns_numerical = config_data["numerical_columns"]
+        columns_categorical = config_data["categorical_columns"]
         columns_to_drop = config_data["columns_to_drop"]
-        df = df.drop(columns=columns_to_drop)
+        task = config_data["task"]
+
+        if columns_to_drop:
+            df = df.drop(columns=columns_to_drop)
         df = drop_fill_na(df, columns_numerical, columns_categorical, dropna, fillna)
 
         # drop from config_data
@@ -372,12 +383,13 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
         dataset = FixedSizeBinaryTableDataset(
             table=df,
-            **config_data["dataset"],
+            **config_data,
         )
 
         classifier_free_guidance = config_trainer["classifier_free_guidance"]
         diffusion_target = config_diffusion["target"]
 
+        device = accelerate.Accelerator().device
         model = SimpleTableGenerator(
             data_dim=dataset.row_size,
             out_dim=(
@@ -387,24 +399,40 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             ),
             task=dataset.task,
             conditional=dataset.conditional,
-            n_classes=dataset.n_classes,
+            n_classes=0 if task == "regression" else dataset.n_classes,
             classifier_free_guidance=classifier_free_guidance,
             **config_model,
-        )
+        ).to(device)
 
         diffusion = BinaryDiffusion1D(
             denoise_model=model,
             **config_diffusion,
-        )
+        ).to(device)
 
-        # todo: implement logger
+        comment = config["comment"]
+        results_folder = Path(f"results/{comment}")
+        results_folder.mkdir(parents=True, exist_ok=True)
+
+        # save config as yaml file in results_folder
+        save_config(config, results_folder / "config.yaml")
+
+        if logger is None:
+            logger = wandb.init(
+                project="binary-diffusion-tabular", config=config, name=comment
+            )
+
         return cls(
             diffusion=diffusion,
             dataset=dataset,
+            results_folder=results_folder,
+            logger=logger,
             **config_trainer,
         )
 
     def train(self) -> None:
+        self.diffusion.to(self.device)
+        self.diffusion.train()
+
         with tqdm(
             initial=self.step,
             total=self.train_num_steps,
@@ -536,12 +564,14 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         return labels_val
 
     def _preprocess_labels(self, label: torch.Tensor) -> torch.Tensor:
-        if self.task == "regression":
+        if self.task == "regression" and len(label.shape) == 1:
             label = label.unsqueeze(1)
 
         if self.classifier_free_guidance:
             if self.task == "classification":
-                label = F.one_hot(label, num_classes=self.n_classes).to(torch.float)
+                label = F.one_hot(label.long(), num_classes=self.n_classes).to(
+                    torch.float
+                )
                 label = zero_out_randomly(label, self.zero_token_probability)
             else:
                 # regression
@@ -549,7 +579,7 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
                 mask = torch.rand_like(label) < self.zero_token_probability
                 label[mask] = -1
 
-        return label
+        return label.to(self.device)
 
     def _create_dataloader(self) -> DataLoader:
         return DataLoader(

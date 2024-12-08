@@ -11,6 +11,9 @@ from binary_diffusion_tabular.transformation import (
 )
 
 
+__all__ = ["FixedSizeBinaryTableDataset"]
+
+
 class FixedSizeBinaryTableDataset(Dataset):
     """Pytorch dataset for fixed size binary tables."""
 
