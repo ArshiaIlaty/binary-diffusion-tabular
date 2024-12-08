@@ -1,6 +1,13 @@
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tabular-data-generation-using-binary/tabular-data-generation-on-adult-census)](https://paperswithcode.com/sota/tabular-data-generation-on-adult-census?p=tabular-data-generation-using-binary)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tabular-data-generation-using-binary/tabular-data-generation-on-diabetes)](https://paperswithcode.com/sota/tabular-data-generation-on-diabetes?p=tabular-data-generation-using-binary)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tabular-data-generation-using-binary/tabular-data-generation-on-travel)](https://paperswithcode.com/sota/tabular-data-generation-on-travel?p=tabular-data-generation-using-binary)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tabular-data-generation-using-binary/tabular-data-generation-on-sick)](https://paperswithcode.com/sota/tabular-data-generation-on-sick?p=tabular-data-generation-using-binary)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tabular-data-generation-using-binary/tabular-data-generation-on-california-housing)](https://paperswithcode.com/sota/tabular-data-generation-on-california-housing?p=tabular-data-generation-using-binary)
+[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/tabular-data-generation-using-binary/tabular-data-generation-on-heloc)](https://paperswithcode.com/sota/tabular-data-generation-on-heloc?p=tabular-data-generation-using-binary)
+
 # Tabular Data Generation using Binary Diffusion
 
-This repository contains the official implementation of the paper "Tabular Data Generation using Binary Diffusion", 
+This repository contains the official implementation of the paper "[Tabular Data Generation using Binary Diffusion](https://arxiv.org/abs/2409.13882)", 
 accepted to [3rd Table Representation Learning Workshop @ NeurIPS 2024](https://table-representation-learning.github.io/).
 
 # Abstract
@@ -18,11 +25,154 @@ datasets while being significantly smaller in size.
 
 # Installation
 
-COMING SOON
+## Local conda installation
+```bash
+conda env create -f environment.yml
+```
+
+## Local pip installation
+
+```bash
+pip install -r requirements.txt
+```
 
 # Quickstart
 
-COMING SOON
+## Training
+
+To use [train.py](train.py) script, first fill configuration fill. See examples in [configs](configs). Then run:
+```bash
+python train.py -c=<path to config>
+```
+
+## Example usage
+```python
+import pandas as pd
+import wandb
+
+from binary_diffusion_tabular import (
+    FixedSizeBinaryTableDataset, 
+    SimpleTableGenerator, 
+    BinaryDiffusion1D, 
+    FixedSizeTableBinaryDiffusionTrainer,
+    drop_fill_na
+)
+
+df = pd.read_csv("./data/adult_train.csv")
+columns_numerical = [
+    "age",
+    "fnlwgt",
+    "education-num",
+    "capital-gain",
+    "capital-loss",
+    "hours-per-week",
+]
+
+columns_categorical = [
+    "workclass",
+    "education",
+    "marital-status",
+    "occupation",
+    "relationship",
+    "race",
+    "sex",
+    "native-country"
+]
+
+task = "classification"
+column_target = "label"
+
+df = drop_fill_na(
+    df=df,
+    columns_numerical=columns_numerical,
+    columns_categorical=columns_categorical,
+    dropna=True,
+    fillna=False
+)
+
+dataset = FixedSizeBinaryTableDataset(
+    table=df,
+    target_column=column_target,    # conditional generation
+    split_feature_target=True,
+    task=task,
+    numerical_columns=columns_numerical,
+    categorical_columns=columns_categorical
+)
+
+classifier_free_guidance = True
+target_diffusion = "two_way"
+
+dim = 256
+n_res_blocks = 3
+device = "cuda"
+
+model = SimpleTableGenerator(
+    data_dim=dataset.row_size,
+    dim=dim,
+    n_res_blocks=n_res_blocks,
+    out_dim=(
+        dataset.row_size * 2
+        if target_diffusion == "two_way"
+        else dataset.row_size
+    ),
+    task=task,
+    conditional=dataset.conditional,
+    n_classes=0 if task == "regression" else dataset.n_classes,
+    classifier_free_guidance=classifier_free_guidance,
+).to(device)
+
+schedule = "quad"
+n_timesteps = 1000
+
+diffusion = BinaryDiffusion1D(
+    denoise_model=model,
+    schedule="quad",
+    n_timesteps=n_timesteps,
+    target=target_diffusion
+).to(device)
+
+logger = wandb.init(
+    project="your-project",
+    config={"key": "value"},
+    name="adult_CFG"
+)
+
+num_training_steps = 500_000
+log_every = 100
+save_every = 10_000
+save_num_samples = 64
+ema_decay = 0.995
+ema_update_every = 10
+lr = 1e-4
+opt_type = "adam"
+batch_size = 256
+n_workers = 16
+zero_token_probability = 0.1
+results_folder = "./results/adult_CFG"
+
+trainer = FixedSizeTableBinaryDiffusionTrainer(
+    diffusion=diffusion,
+    dataset=dataset,
+    train_num_steps=num_training_steps,
+    log_every=log_every,
+    save_every=save_every,
+    save_num_samples=save_num_samples,
+    max_grad_norm=None,
+    gradient_accumulate_every=1,
+    ema_decay=ema_decay,
+    ema_update_every=ema_update_every,
+    lr=lr,
+    opt_type=opt_type,
+    batch_size=batch_size,
+    dataloader_workers=n_workers,
+    classifier_free_guidance=classifier_free_guidance,
+    zero_token_probability=zero_token_probability,
+    logger=logger,
+    results_folder=results_folder
+)
+
+trainer.train()
+```
 
 # Citation
 ```
