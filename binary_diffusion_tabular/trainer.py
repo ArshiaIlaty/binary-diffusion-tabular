@@ -534,11 +534,13 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             rows_ema = base_model_ema.sample(n=self.save_num_samples, y=labels_val)
 
         if self.conditional:
-            rows_df, labels_df = self.transformation.transform(rows, labels_val)
-            rows_ema_df, labels_ema_df = self.transformation.transform(
+            if self.classifier_free_guidance:
+                labels_val = torch.argmax(labels_val, dim=1).detach()
+
+            rows_df, labels_df = self.transformation.inverse_transform(rows, labels_val)
+            rows_ema_df, labels_ema_df = self.transformation.inverse_transform(
                 rows_ema, labels_val
             )
-
             rows_df[self.dataset.target_column] = labels_df
             rows_ema_df[self.dataset.target_column] = labels_ema_df
         else:
@@ -558,6 +560,9 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             labels_val = torch.randint(
                 0, self.n_classes, (self.save_num_samples,), device=self.device
             )
+
+            if self.classifier_free_guidance:
+                labels_val = F.one_hot(labels_val, num_classes=self.n_classes).to(self.device).float()
         else:
             labels_val = torch.rand((self.save_num_samples, 1), device=self.device)
 
