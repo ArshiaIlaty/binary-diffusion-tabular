@@ -4,7 +4,6 @@ from pathlib import Path
 from collections import defaultdict
 
 import accelerate
-import pandas as pd
 from tqdm.auto import tqdm
 
 import torch
@@ -25,6 +24,7 @@ from binary_diffusion_tabular.utils import (
     zero_out_randomly,
     get_base_model,
     save_config,
+    get_random_labels
 )
 
 
@@ -513,7 +513,14 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         base_model_ema.eval()
 
         with self.accelerator.autocast():
-            labels_val = self._get_random_validation_labels()
+            labels_val = get_random_labels(
+                conditional=self.conditional,
+                task=self.task,
+                n_classes=self.n_classes,
+                classifier_free_guidance=self.classifier_free_guidance,
+                n_labels=self.save_num_samples,
+                device=self.device,
+            )
 
             # sampling without
             rows = base_model.sample(n=self.save_num_samples, y=labels_val)
@@ -537,26 +544,6 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         rows_ema_df.to_csv(
             self.results_folder / f"samples_{milestone}_ema.csv", index=False
         )
-
-    def _get_random_validation_labels(self) -> torch.Tensor | None:
-        if not self.conditional:
-            return None
-
-        if self.task == "classification":
-            labels_val = torch.randint(
-                0, self.n_classes, (self.save_num_samples,), device=self.device
-            )
-
-            if self.classifier_free_guidance:
-                labels_val = (
-                    F.one_hot(labels_val, num_classes=self.n_classes)
-                    .to(self.device)
-                    .float()
-                )
-        else:
-            labels_val = torch.rand((self.save_num_samples, 1), device=self.device)
-
-        return labels_val
 
     def _preprocess_labels(self, label: torch.Tensor) -> torch.Tensor:
         if self.task == "regression" and len(label.shape) == 1:

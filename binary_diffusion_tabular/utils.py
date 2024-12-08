@@ -2,9 +2,10 @@ from typing import Literal, Union, List, Dict
 from pathlib import Path
 import yaml
 
-import pandas as pd
+import numpy as np
 
 import torch
+import torch.nn.functional as F
 
 
 __all__ = [
@@ -17,6 +18,8 @@ __all__ = [
     "get_base_model",
     "get_config",
     "save_config",
+    "select_equally_distributed_numbers",
+    "get_random_labels"
 ]
 
 
@@ -84,3 +87,48 @@ def save_config(config: Dict, yaml_file_path: PathOrStr) -> None:
             yaml.dump(config, file, sort_keys=False, default_flow_style=False)
     except Exception as e:
         print(f"Error saving dictionary to YAML file: {e}")
+
+
+def select_equally_distributed_numbers(N: int, K: int) -> np.ndarray:
+    if N % K == 0:
+        return np.arange(0, N, N // K)
+
+    step = (N - 1) // (K - 1)
+    return np.arange(0, N, step)[:K]
+
+
+def get_random_labels(
+    *,
+    conditional: bool,
+    task: TASK,
+    n_classes: int,
+    classifier_free_guidance: bool,
+    n_labels: int,
+    device
+) -> torch.Tensor | None:
+    """Get random labels for a given task
+
+    Args:
+        conditional: if conditional generate labels, if not return None
+        task: task to generate labels for
+        n_classes:  number of classes for classification task
+        classifier_free_guidance: if True, classification labels will be one-hot encoded
+        n_labels: number of labels to generate
+        device: device to use
+
+    Returns:
+        torch.Tensor | None: labels to generate or None
+    """
+
+    if not conditional:
+        return None
+
+    if task == "classification":
+        labels = torch.randint(0, n_classes, size=(n_labels,), device=device)
+
+        if classifier_free_guidance:
+            labels = F.one_hot(labels, num_classes=n_classes).to(device=device).float()
+    else:
+        labels = torch.rand((n_labels, 1), device=device)
+
+    return labels
