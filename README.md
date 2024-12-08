@@ -38,6 +38,11 @@ pip install -r requirements.txt
 
 # Quickstart
 
+## Run tests
+```bash
+python -m unittest discover -s ./tests
+```
+
 ## Training
 
 To use [train.py](train.py) script, first fill configuration fill. See examples in [configs](configs). Then run:
@@ -45,7 +50,7 @@ To use [train.py](train.py) script, first fill configuration fill. See examples 
 python train.py -c=<path to config>
 ```
 
-## Example usage
+## Example training script
 ```python
 import pandas as pd
 import wandb
