@@ -1,0 +1,89 @@
+data:                                      # dataset parameters
+  path_table: ./data/diabetes_train.csv    # path to dataset in csv format
+  numerical_columns:                       # list of numerical columns
+    - num_lab_procedures
+    - num_procedures
+    - num_medications
+    - number_outpatient
+    - number_emergency
+    - number_inpatient
+    - number_diagnoses
+    - time_in_hospital
+  categorical_columns:                     # list of categorical columns
+    - race
+    - gender
+    - age
+    - weight
+    - admission_type_id
+    - discharge_disposition_id
+    - admission_source_id
+    - payer_code
+    - medical_specialty
+    - diag_1
+    - diag_2
+    - diag_3
+    - max_glu_serum
+    - A1Cresult
+    - metformin
+    - repaglinide
+    - nateglinide
+    - chlorpropamide
+    - glimepiride
+    - acetohexamide
+    - glipizide
+    - glyburide
+    - tolbutamide
+    - pioglitazone
+    - rosiglitazone
+    - acarbose
+    - miglitol
+    - troglitazone
+    - tolazamide
+    - examide
+    - citoglipton
+    - insulin
+    - glyburide-metformin
+    - glipizide-metformin
+    - glimepiride-pioglitazone
+    - metformin-rosiglitazone
+    - metformin-pioglitazone
+    - change
+    - diabetesMed
+  columns_to_drop:                   # list of columns to drop
+    - encounter_id
+    - patient_nbr
+  dropna: True                       # if True, rows with nan values are dropped
+  fillna: False                      # if True, numerical nan values are replaced with mean, categorical are replaced with mode. Either dropna or fillna can be True
+  target_column: readmitted          # target column, if conditional generation. If None, unconditional generation
+  split_feature_target: True         # should be True for conditional generation
+  task: classification               # table task, can be `classification` or `regression`
+
+model:                               # denoiser model parameters
+  dim: 256                           # dimensionality of internal blocks
+  n_res_blocks: 3                    # number of residual blocks
+
+diffusion:                           # diffusion parameters
+  schedule: quad                     # noise schedule, can be `linear`, `quad`, `sigmoid`
+  n_timesteps: 1000                  # number of denoising steps in denoiser pretraining
+  target: two_way                    # denoiser prediction target: `mask`, `target`, `two_way`
+
+trainer:                             # trainer parameters
+  train_num_steps: 500000            # number of training steps
+  log_every: 100                     # logging frequency
+  save_every: 10000                  # model saving frequency
+  save_num_samples: 64               # number of generated samples to save during evaluation
+  max_grad_norm:                     # maximum gradient norm, if None gradient clipping is not applied
+  gradient_accumulate_every: 1       # gradient accumulation steps
+  ema_decay: 0.995                   # EMA decay
+  ema_update_every: 10               # EMA update frequency
+  lr: 0.0001                         # learning rate
+  opt_type: adam                     # type of optimizer to use. Options: `adam`, `adamw`
+  opt_params:                        # optimizer parameters. See optimizer implementation for details
+  batch_size: 256                    # training batch size
+  dataloader_workers: 16             # number of dataloader workers
+  classifier_free_guidance: True     # if True, classifier free guidance is used
+  zero_token_probability: 0.1        # zero token probability in classifier free guidance. If classifier_free_guidance False, not use
+
+fine_tune_from:                      # path to model checkpoint to fine tune from
+
+comment: diabetes_CFG                # comment for the results folder and logging
