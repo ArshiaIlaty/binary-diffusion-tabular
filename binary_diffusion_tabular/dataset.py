@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union, Optional
+from typing import List, Tuple, Union, Optional, Dict
 
 import pandas as pd
 
@@ -11,7 +11,45 @@ from binary_diffusion_tabular.transformation import (
 )
 
 
-__all__ = ["FixedSizeBinaryTableDataset"]
+__all__ = ["FixedSizeBinaryTableDataset", "drop_fill_na"]
+
+
+def drop_fill_na(
+    df: pd.DataFrame,
+    columns_numerical: List[str],
+    columns_categorical: List[str],
+    dropna: bool,
+    fillna: bool,
+) -> pd.DataFrame:
+    """Drops or fills NaN values in a dataframe
+
+    Args:
+        df: dataframe
+        columns_numerical: numerical column names
+        columns_categorical:  categorical column names
+        dropna: if True, drops NaN values
+        fillna:  if True, fills NaN values. Numerical columns are replaced with mean. Categorical columns are replaced
+                 with mode.
+
+    Returns:
+        pd.DataFrame: dataframe with NaN values dropped/filled
+    """
+
+    if dropna and fillna:
+        raise ValueError("Cannot have both dropna and fillna")
+
+    if dropna:
+        df = df.dropna()
+
+    if fillna:
+        for col in columns_numerical:
+            df[col] = df[col].fillna(df[col].mean())
+
+        # replace na for categorical columns with mode
+        for col in columns_categorical:
+            df[col] = df[col].fillna(df[col].mode()[0])
+
+    return df
 
 
 class FixedSizeBinaryTableDataset(Dataset):
@@ -63,6 +101,30 @@ class FixedSizeBinaryTableDataset(Dataset):
             )
         else:
             self.features_binary = self.transformation.fit_transform(self.table)
+
+    @classmethod
+    def from_config(cls, config: Dict) -> "FixedSizeBinaryTableDataset":
+        path_table = config["path_table"]
+        df = pd.read_csv(path_table)
+        dropna = config["dropna"]
+        fillna = config["fillna"]
+        columns_numerical = config["numerical_columns"]
+        columns_categorical = config["categorical_columns"]
+        columns_to_drop = config["columns_to_drop"]
+        task = config["task"]
+
+        if columns_to_drop:
+            df = df.drop(columns=columns_to_drop)
+        df = drop_fill_na(df, columns_numerical, columns_categorical, dropna, fillna)
+
+        return cls(
+            table=df,
+            target_column=config["target_column"],
+            task=task,
+            split_feature_target=config["split_feature_target"],
+            numerical_columns=config["numerical_columns"],
+            categorical_columns=config["categorical_columns"],
+        )
 
     @property
     def n_classes(self) -> int:

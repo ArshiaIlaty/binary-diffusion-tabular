@@ -15,7 +15,6 @@ __all__ = [
     "cycle",
     "zero_out_randomly",
     "get_base_model",
-    "drop_fill_na",
     "get_config",
     "save_config",
 ]
@@ -65,44 +64,6 @@ def get_base_model(model):
     if hasattr(model, "module"):
         return model.module
     return model
-
-
-def drop_fill_na(
-    df: pd.DataFrame,
-    columns_numerical: List[str],
-    columns_categorical: List[str],
-    dropna: bool,
-    fillna: bool,
-) -> pd.DataFrame:
-    """Drops or fills NaN values in a dataframe
-
-    Args:
-        df: dataframe
-        columns_numerical: numerical column names
-        columns_categorical:  categorical column names
-        dropna: if True, drops NaN values
-        fillna:  if True, fills NaN values. Numerical columns are replaced with mean. Categorical columns are replaced
-                 with mode.
-
-    Returns:
-        pd.DataFrame: dataframe with NaN values dropped/filled
-    """
-
-    if dropna and fillna:
-        raise ValueError("Cannot have both dropna and fillna")
-
-    if dropna:
-        df = df.dropna()
-
-    if fillna:
-        for col in columns_numerical:
-            df[col] = df[col].fillna(df[col].mean())
-
-        # replace na for categorical columns with mode
-        for col in columns_categorical:
-            df[col] = df[col].fillna(df[col].mode()[0])
-
-    return df
 
 
 def get_config(config):

@@ -24,7 +24,6 @@ from binary_diffusion_tabular.utils import (
     cycle,
     zero_out_randomly,
     get_base_model,
-    drop_fill_na,
     save_config,
 )
 
@@ -362,29 +361,8 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         config_diffusion = config["diffusion"]
         config_trainer = config["trainer"]
 
-        path_table = config_data["path_table"]
-        df = pd.read_csv(path_table)
-        dropna = config_data["dropna"]
-        fillna = config_data["fillna"]
-        columns_numerical = config_data["numerical_columns"]
-        columns_categorical = config_data["categorical_columns"]
-        columns_to_drop = config_data["columns_to_drop"]
         task = config_data["task"]
-
-        if columns_to_drop:
-            df = df.drop(columns=columns_to_drop)
-        df = drop_fill_na(df, columns_numerical, columns_categorical, dropna, fillna)
-
-        # drop from config_data
-        del config_data["path_table"]
-        del config_data["dropna"]
-        del config_data["fillna"]
-        del config_data["columns_to_drop"]
-
-        dataset = FixedSizeBinaryTableDataset(
-            table=df,
-            **config_data,
-        )
+        dataset = FixedSizeBinaryTableDataset.from_config(config_data)
 
         classifier_free_guidance = config_trainer["classifier_free_guidance"]
         diffusion_target = config_diffusion["target"]
