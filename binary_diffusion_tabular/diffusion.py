@@ -95,6 +95,16 @@ class BaseDiffusion(nn.Module, ABC):
         self.model = denoise_model
         self.device = next(self.model.parameters()).device
 
+    @classmethod
+    @abstractmethod
+    def from_config(cls, denoise_model: BaseModel, config: Dict) -> "BaseDiffusion":
+        pass
+
+    @property
+    @abstractmethod
+    def config(self) -> Dict:
+        pass
+
     @abstractmethod
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, Dict, Dict]:
         pass
@@ -153,6 +163,21 @@ class BinaryDiffusion1D(BaseDiffusion):
         )
         self.flip_values = flip_values
         self.pred_postproc = torch.sigmoid
+
+    @classmethod
+    def from_config(cls, denoise_model: SimpleTableGenerator, config: Dict) -> "BaseDiffusion":
+        return cls(
+            denoise_model,
+            **config,
+        )
+
+    @property
+    def config(self) -> Dict:
+        return {
+            "schedule": self.schedule,
+            "n_timesteps": self.n_timesteps,
+            "target": self.target,
+        }
 
     @property
     def conditional(self) -> bool:

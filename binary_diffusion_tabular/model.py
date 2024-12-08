@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, Dict
 import math
 
 import torch
@@ -73,6 +73,16 @@ class BaseModel(nn.Module, ABC):
         self.data_dim = data_dim
         self.out_dim = out_dim
 
+    @classmethod
+    @abstractmethod
+    def from_config(cls, config: Dict) -> "BaseModel":
+        pass
+
+    @property
+    @abstractmethod
+    def config(self) -> Dict:
+        pass
+
     @abstractmethod
     def forward(
         self,
@@ -118,6 +128,8 @@ class SimpleTableGenerator(BaseModel):
 
         super(SimpleTableGenerator, self).__init__(data_dim, out_dim)
 
+        self.dim = dim
+        self.n_res_blocks = n_res_blocks
         self.n_classes = n_classes
         self.classifier_free_guidance = classifier_free_guidance
         self.conditional = conditional
@@ -152,6 +164,37 @@ class SimpleTableGenerator(BaseModel):
             dim += item
 
         self.out = nn.Linear(dim, self.out_dim, bias=True)
+
+    @property
+    def config(self) -> Dict:
+        """Returns model configuration in dictionary
+
+        Returns:
+            dict: model configuration with the following keys:
+                  data_dim: dimension of data
+                  dim: internal dimensionality
+                  n_res_blocks: number of residual blocks
+                  out_dim: number of output dimensions
+                  task: task to generate data for. Options: classification, regression
+                  conditional: if True, generative model is conditional
+                  n_classes: number of classes for classification
+                  classifier_free_guidance: if True, classifier free guidance is used during sampling
+        """
+
+        return {
+            "data_dim": self.data_dim,
+            "dim": self.dim,
+            "n_res_blocks": self.n_res_blocks,
+            "out_dim": self.out_dim,
+            "task": self.task,
+            "conditional": self.conditional,
+            "n_classes": self.n_classes,
+            "classifier_free_guidance": self.classifier_free_guidance,
+        }
+
+    @classmethod
+    def from_config(cls, config: Dict) -> "SimpleTableGenerator":
+        return cls(**config)
 
     def forward(
         self,

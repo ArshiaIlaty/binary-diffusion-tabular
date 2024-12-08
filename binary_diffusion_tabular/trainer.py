@@ -165,9 +165,14 @@ class BaseTrainer(ABC):
 
         data = {
             "step": self.step,
-            "model": self.accelerator.get_state_dict(self.diffusion),
+            "diffusion": self.accelerator.get_state_dict(self.diffusion),
+
+            # save diffusion and model configs for easy loading without dataset preprocessing
+            "config_diffusion": self.diffusion.config,
+            "config_model": self.diffusion.model.config,
+
             "opt": self.opt.state_dict(),
-            "ema": self.ema.state_dict(),
+            "diffusion_ema": self.ema.state_dict(),
             "scaler": (
                 self.accelerator.scaler.state_dict()
                 if exists(self.accelerator.scaler)
@@ -368,6 +373,9 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         diffusion_target = config_diffusion["target"]
 
         device = accelerate.Accelerator().device
+
+        # row_size is given from FixedSizeBinaryTableDataset
+        # later SimpleTableGenerator can be loaded from config
         model = SimpleTableGenerator(
             data_dim=dataset.row_size,
             out_dim=(
@@ -540,7 +548,11 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             )
 
             if self.classifier_free_guidance:
-                labels_val = F.one_hot(labels_val, num_classes=self.n_classes).to(self.device).float()
+                labels_val = (
+                    F.one_hot(labels_val, num_classes=self.n_classes)
+                    .to(self.device)
+                    .float()
+                )
         else:
             labels_val = torch.rand((self.save_num_samples, 1), device=self.device)
 
