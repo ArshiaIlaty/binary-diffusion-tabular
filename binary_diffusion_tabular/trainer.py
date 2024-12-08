@@ -114,6 +114,11 @@ class BaseTrainer(ABC):
     def from_config(cls, config: Dict[str, Any]) -> "BaseTrainer":
         pass
 
+    @classmethod
+    @abstractmethod
+    def from_checkpoint(cls, config: Dict[str, Any]) -> "BaseTrainer":
+        pass
+
     @abstractmethod
     def train(self) -> None:
         pass
@@ -178,7 +183,8 @@ class BaseTrainer(ABC):
                 if exists(self.accelerator.scaler)
                 else None
             ),
-            "config": config,
+            # save train config as well
+            "config_train": config,
         }
 
         torch.save(data, str(self.results_folder / f"model-{milestone}.pt"))
