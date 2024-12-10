@@ -116,7 +116,7 @@ class BaseTrainer(ABC):
 
     @classmethod
     @abstractmethod
-    def from_checkpoint(cls, config: Dict[str, Any]) -> "BaseTrainer":
+    def from_checkpoint(cls, checkpoint: PathOrStr) -> "BaseTrainer":
         pass
 
     @abstractmethod
@@ -309,6 +309,25 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
             self.dataset.n_classes == self.diffusion.n_classes
         ):
             raise RuntimeError("dataset.n_classes must equal diffusion.n_classes")
+
+    @classmethod
+    def from_checkpoint(cls, path_checkpoint: PathOrStr) -> "FixedSizeTableBinaryDiffusionTrainer":
+        """Loads trainer from checkpoint.
+
+        Args:
+            path_checkpoint: path to the checkpoint
+
+        Returns:
+            FixedSizeTableBinaryDiffusionTrainer: trainer
+        """
+
+        ckpt = torch.load(path_checkpoint)
+        config = ckpt["config_train"]
+        logger = wandb.init(project="binary-diffusion-tabular", config=config, name=config["comment"])
+        trainer = FixedSizeTableBinaryDiffusionTrainer.from_config(config, logger)
+
+        trainer.load_checkpoint(path_checkpoint)
+        return trainer
 
     @classmethod
     def from_config(
