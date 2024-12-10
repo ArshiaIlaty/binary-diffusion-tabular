@@ -26,6 +26,9 @@ datasets while being significantly smaller in size.
 # Installation
 
 ## Local conda installation
+
+Conda environment was tested on Ubuntu 22.04 LTS and on Mac OS Sonoma 14.6 with M3 chip.
+
 ```bash
 conda env create -f environment.yml
 ```
