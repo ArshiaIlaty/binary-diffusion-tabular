@@ -24,7 +24,7 @@ from binary_diffusion_tabular.utils import (
     zero_out_randomly,
     get_base_model,
     save_config,
-    get_random_labels
+    get_random_labels,
 )
 
 
@@ -171,11 +171,9 @@ class BaseTrainer(ABC):
         data = {
             "step": self.step,
             "diffusion": self.accelerator.get_state_dict(self.diffusion),
-
             # save diffusion and model configs for easy loading without dataset preprocessing
             "config_diffusion": self.diffusion.config,
             "config_model": self.diffusion.model.config,
-
             "opt": self.opt.state_dict(),
             "diffusion_ema": self.ema.state_dict(),
             "scaler": (
@@ -310,8 +308,13 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
         ):
             raise RuntimeError("dataset.n_classes must equal diffusion.n_classes")
 
+        # save transformation in joblib format
+        self.dataset.transformation.save_checkpoint(self.results_folder / "transformation.joblib")
+
     @classmethod
-    def from_checkpoint(cls, path_checkpoint: PathOrStr) -> "FixedSizeTableBinaryDiffusionTrainer":
+    def from_checkpoint(
+        cls, path_checkpoint: PathOrStr
+    ) -> "FixedSizeTableBinaryDiffusionTrainer":
         """Loads trainer from checkpoint.
 
         Args:
@@ -323,7 +326,9 @@ class FixedSizeTableBinaryDiffusionTrainer(BaseTrainer):
 
         ckpt = torch.load(path_checkpoint)
         config = ckpt["config_train"]
-        logger = wandb.init(project="binary-diffusion-tabular", config=config, name=config["comment"])
+        logger = wandb.init(
+            project="binary-diffusion-tabular", config=config, name=config["comment"]
+        )
         trainer = FixedSizeTableBinaryDiffusionTrainer.from_config(config, logger)
 
         trainer.load_checkpoint(path_checkpoint)

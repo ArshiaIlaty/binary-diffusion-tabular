@@ -165,7 +165,18 @@ class FixedSizeBinaryTableTransformation:
         joblib.dump(self, path_checkpoint)
 
     @classmethod
-    def from_checkpoint(cls, path_checkpoint: PathOrStr) -> "FixedSizeBinaryTableTransformation":
+    def from_checkpoint(
+        cls, path_checkpoint: PathOrStr
+    ) -> "FixedSizeBinaryTableTransformation":
+        """Loads the transformation from a .joblib file.
+
+        Args:
+            path_checkpoint: Path to the .joblib file.
+
+        Returns:
+            FixedSizeBinaryTableTransformation: The loaded transformation.
+        """
+
         transformer = joblib.load(path_checkpoint)
         return transformer
 
