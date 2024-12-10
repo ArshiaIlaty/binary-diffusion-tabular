@@ -1,7 +1,11 @@
 import unittest
+import os
+import tempfile
+
 import pandas as pd
 import torch
 import numpy as np
+
 from binary_diffusion_tabular import FixedSizeBinaryTableTransformation
 
 
@@ -185,6 +189,62 @@ class TestFixedSizeBinaryTableTransformation(unittest.TestCase):
             np.array_equal(original_labels, y_back),
             "Original labels and inverse transformed labels should match",
         )
+
+    def test_save_and_load_transformation(self):
+        """Test that saving and loading the transformation preserves its state and functionality."""
+        df_y = self.df["label"]
+        df_x = self.df.drop("label", axis=1)
+
+        x_binary_original, y_trans_original = self.transformation.fit_transform(df_x, df_y)
+
+        with tempfile.NamedTemporaryFile(suffix='.joblib', delete=False) as tmp_file:
+            temp_filepath = tmp_file.name
+
+        try:
+            self.transformation.save_checkpoint(temp_filepath)
+
+            loaded_transformation = FixedSizeBinaryTableTransformation.from_checkpoint(temp_filepath)
+
+            self.assertTrue(loaded_transformation.fitted, "Loaded transformer should be fitted.")
+            self.assertTrue(
+                loaded_transformation.fitted_label,
+                "Loaded transformer should have fitted labels.",
+            )
+
+            x_binary_loaded, y_trans_loaded = loaded_transformation.transform(df_x, df_y)
+
+            self.assertTrue(
+                torch.all(x_binary_original == x_binary_loaded),
+                "Transformed data from loaded transformer should match the original transformer.",
+            )
+            self.assertTrue(
+                torch.all(y_trans_original == y_trans_loaded),
+                "Transformed labels from loaded transformer should match the original transformer.",
+            )
+
+            df_x_back_loaded, y_back_loaded = loaded_transformation.inverse_transform(
+                x_binary_loaded, y_trans_loaded
+            )
+
+            for col in self.categorical_cols:
+                original = self.df[col].reset_index(drop=True)
+                back = df_x_back_loaded[col].reset_index(drop=True)
+                self.assertTrue(
+                    original.equals(back),
+                    f"Categorical column '{col}' does not match after inverse transform with loaded transformer",
+                )
+
+            for col in self.numerical_cols:
+                original = self.df[col].values
+                back = df_x_back_loaded[col].values
+                self.assertTrue(
+                    np.allclose(original, back, atol=1e-5),
+                    f"Numerical column '{col}' does not match after inverse transform with loaded transformer",
+                )
+
+        finally:
+            # Clean up the temporary file
+            os.remove(temp_filepath)
 
 
 if __name__ == "__main__":

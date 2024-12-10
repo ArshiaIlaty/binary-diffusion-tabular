@@ -1,6 +1,7 @@
 from typing import List, Tuple, Literal, Optional, Dict, Union
 from joblib import Parallel, delayed
 import math
+import joblib
 
 import numpy as np
 import pandas as pd
@@ -8,7 +9,7 @@ from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 import torch
 
-from binary_diffusion_tabular import TASK
+from binary_diffusion_tabular import TASK, PathOrStr
 
 
 __all__ = [
@@ -153,6 +154,20 @@ class FixedSizeBinaryTableTransformation:
         self.fitted_label = False
         self.metadata = None
         self.size = None
+
+    def save_checkpoint(self, path_checkpoint: PathOrStr) -> None:
+        """
+        Save the current state of the transformation to a file.
+
+        Args:
+            path_checkpoint: Path to the file where the state will be saved.
+        """
+        joblib.dump(self, path_checkpoint)
+
+    @classmethod
+    def from_checkpoint(cls, path_checkpoint: PathOrStr) -> "FixedSizeBinaryTableTransformation":
+        transformer = joblib.load(path_checkpoint)
+        return transformer
 
     @property
     def row_size(self) -> int:
