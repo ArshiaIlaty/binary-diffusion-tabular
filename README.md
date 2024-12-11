@@ -202,6 +202,23 @@ python sample.py \
        --use_ema                                                # whether to use EMA diffusion model
 ```
 
+# Results
+
+# Results
+
+The table below presents the **Binary Diffusion** results across various datasets and models. Performance metrics are shown as **mean ± standard deviation**.
+
+| **Dataset**             | **LR (Binary Diffusion)** | **DT (Binary Diffusion)** | **RF (Binary Diffusion)** | **Params** |
+|-------------------------|---------------------------|---------------------------|---------------------------|------------|
+| **Travel**              | **83.79 ± 0.08**          | **88.90 ± 0.57**          | **89.95 ± 0.44**          | **1.1M**   |
+| **Sick**                | 96.14 ± 0.63              | **97.07 ± 0.24**          | 96.59 ± 0.55              | **1.4M**   |
+| **HELOC**               | 71.76 ± 0.30              | 70.25 ± 0.43              | 70.47 ± 0.32              | **2.6M**   |
+| **Adult Income**        | **85.45 ± 0.11**          | **85.27 ± 0.11**          | **85.74 ± 0.11**          | **1.4M**   |
+| **Diabetes**            | **57.75 ± 0.04**          | **57.13 ± 0.15**          | 57.52 ± 0.12              | **1.8M**   |
+| **California Housing**  | *0.55 ± 0.00*             | 0.45 ± 0.00               | 0.39 ± 0.00               | **1.5M**   |
+
+---
+
 # Citation
 ```
 @article{kinakh2024tabular,
