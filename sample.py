@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 from functools import partial
 
+import pandas as pd
 from tqdm.auto import tqdm
 
 import torch
@@ -10,9 +11,11 @@ import torch.nn as nn
 from binary_diffusion_tabular import (
     BinaryDiffusion1D,
     SimpleTableGenerator,
+    FixedSizeBinaryTableTransformation,
     select_equally_distributed_numbers,
     TASK,
-    get_random_labels
+    get_random_labels,
+    seed_everything
 )
 
 
@@ -21,12 +24,7 @@ def get_sampling_args_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--ckpt", type=str, required=True, help="Path to checkpoint file"
     )
-    parser.add_argument(
-        "--path_test_data",
-        type=str,
-        required=True,
-        help="Path to test data in .csv format",
-    )
+    parser.add_argument("--ckpt_transformation", type=str, help="Path to transformation checkpoint file")
     parser.add_argument(
         "--n_timesteps", "-t", type=int, required=True, help="Number of sampling steps"
     )
@@ -48,7 +46,7 @@ def get_sampling_args_parser() -> argparse.ArgumentParser:
         "--batch_size", "-b", type=int, required=True, help="Batch size for sampling"
     )
     parser.add_argument(
-        "--threshold", "-t", type=float, default=0.5, help="Threshold for binarization"
+        "--threshold", type=float, default=0.5, help="Threshold for binarization"
     )
     parser.add_argument(
         "--strategy",
@@ -61,6 +59,7 @@ def get_sampling_args_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--guidance_scale", "-g", type=float, default=0.0, help="Guidance scale"
     )
+    parser.add_argument("--target_column_name", type=str, help="Target column name")
     parser.add_argument("--device", "-d", type=str, default="cuda", help="Device")
     parser.add_argument("--use_ema", "-e", action="store_true", help="Use EMA")
 
@@ -74,7 +73,8 @@ def cfg_model_fn(
     model: nn.Module,
     guidance_scale: float,
     task: TASK,
-    *args, **kwargs
+    *args,
+    **kwargs
 ) -> torch.Tensor:
     """Classifier free guidance sampling function
 
@@ -109,6 +109,7 @@ def cfg_model_fn(
 if __name__ == "__main__":
     parser = get_sampling_args_parser()
     cli_args = parser.parse_args()
+    seed_everything(cli_args.seed)
 
     path_out = Path(cli_args.out)
     path_out.mkdir(parents=True, exist_ok=True)
@@ -119,6 +120,7 @@ if __name__ == "__main__":
     guidance_scale = cli_args.guidance_scale
     threshold = cli_args.threshold
     strategy = cli_args.strategy
+    target_column_name = cli_args.target_column_name
 
     denoising_model = SimpleTableGenerator.from_config(ckpt["config_model"]).to(device)
     denoising_model.eval()
@@ -128,6 +130,8 @@ if __name__ == "__main__":
         config=ckpt["config_diffusion"],
     ).to(device)
     diffusion.eval()
+
+    transformation = FixedSizeBinaryTableTransformation.from_checkpoint(cli_args.ckpt_transformation)
 
     if cli_args.use_ema:
         diffusion.load_ema(ckpt["diffusion_ema"])
@@ -147,6 +151,7 @@ if __name__ == "__main__":
     n_generated = 0
     n_samples = cli_args.n_samples
     pbar = tqdm(total=n_samples)
+    dfs = []
 
     while n_generated < n_samples:
         labels = get_random_labels(
@@ -159,11 +164,33 @@ if __name__ == "__main__":
         )
 
         x = diffusion.sample(
-            model_fn=partial(cfg_model_fn, guidance_scale=guidance_scale, task=task) if classifier_free_guidance and guidance_scale > 0 else None,
+            model_fn=(
+                partial(cfg_model_fn, guidance_scale=guidance_scale, task=task)
+                if classifier_free_guidance and guidance_scale > 0
+                else None
+            ),
             n=batch_size,
             y=labels,
             timesteps=timesteps_sampling,
             threshold=threshold,
-            strategy=strategy
+            strategy=strategy,
         )
 
+        if conditional:
+            if classifier_free_guidance:
+                labels = torch.argmax(labels, dim=1)
+
+            x_df, labels_df = transformation.inverse_transform(x, labels)
+            x_df[target_column_name] = labels_df
+        else:
+            x_df = transformation.inverse_transform(x)
+
+        x_df = x_df.dropna()
+
+        n_generated += len(x_df)
+        pbar.update(len(x_df))
+        dfs.append(x_df)
+
+    df = pd.concat(dfs)
+    df.to_csv(path_out / "samples.csv", index=False)
+    pbar.close()

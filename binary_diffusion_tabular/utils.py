@@ -1,6 +1,8 @@
-from typing import Literal, Union, List, Dict
+from typing import Literal, Union, Dict
 from pathlib import Path
 import yaml
+import random
+import os
 
 import numpy as np
 
@@ -19,7 +21,8 @@ __all__ = [
     "get_config",
     "save_config",
     "select_equally_distributed_numbers",
-    "get_random_labels"
+    "get_random_labels",
+    "seed_everything"
 ]
 
 
@@ -104,7 +107,7 @@ def get_random_labels(
     n_classes: int,
     classifier_free_guidance: bool,
     n_labels: int,
-    device
+    device,
 ) -> torch.Tensor | None:
     """Get random labels for a given task
 
@@ -132,3 +135,14 @@ def get_random_labels(
         labels = torch.rand((n_labels, 1), device=device)
 
     return labels
+
+
+def seed_everything(seed: int) -> None:
+    random.seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    print(f"Setting all seeds to be {seed} to reproduce...")

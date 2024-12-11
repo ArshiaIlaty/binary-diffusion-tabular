@@ -165,7 +165,9 @@ class BinaryDiffusion1D(BaseDiffusion):
         self.pred_postproc = torch.sigmoid
 
     @classmethod
-    def from_config(cls, denoise_model: SimpleTableGenerator, config: Dict) -> "BaseDiffusion":
+    def from_config(
+        cls, denoise_model: SimpleTableGenerator, config: Dict
+    ) -> "BaseDiffusion":
         return cls(
             denoise_model,
             **config,
