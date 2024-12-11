@@ -55,13 +55,14 @@ def get_sampling_args_parser() -> argparse.ArgumentParser:
         choices=["target", "mask"],
         help="Sampling strategy to use",
     )
-    parser.add_argument("--seed", "-s", type=int, help="Random seed")
+    parser.add_argument("--seed", "-s", type=int, help="Random seed", required=False)
     parser.add_argument(
         "--guidance_scale", "-g", type=float, default=0.0, help="Guidance scale"
     )
-    parser.add_argument("--target_column_name", type=str, help="Target column name")
+    parser.add_argument("--target_column_name", type=str, help="Target column name", required=False)
     parser.add_argument("--device", "-d", type=str, default="cuda", help="Device")
     parser.add_argument("--use_ema", "-e", action="store_true", help="Use EMA")
+    parser.add_argument("--dropna", action="store_true", help="Whether to drop rows with nan during sampling")
 
     return parser
 
@@ -109,7 +110,9 @@ def cfg_model_fn(
 if __name__ == "__main__":
     parser = get_sampling_args_parser()
     cli_args = parser.parse_args()
-    seed_everything(cli_args.seed)
+
+    if cli_args.seed:
+        seed_everything(cli_args.seed)
 
     path_out = Path(cli_args.out)
     path_out.mkdir(parents=True, exist_ok=True)
@@ -185,7 +188,8 @@ if __name__ == "__main__":
         else:
             x_df = transformation.inverse_transform(x)
 
-        x_df = x_df.dropna()
+        if cli_args.dropna:
+            x_df = x_df.dropna()
 
         n_generated += len(x_df)
         pbar.update(len(x_df))

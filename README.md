@@ -182,6 +182,26 @@ trainer = FixedSizeTableBinaryDiffusionTrainer(
 trainer.train()
 ```
 
+## Sampling
+
+To use [sample.py](sample.py) script, you need a pretrained model and data transformation. Then run
+```bash
+python sample.py \
+       --ckpt=<path to model ckpt> \
+       --ckpt_transformation=<path to transformation ckpt> \
+       --n_timesteps=<number of sampling steps> \
+       --out=<path to output folder> \
+       --n_samples=<number of rows to generate> \
+       --batch_size=<sampling batch size> \
+       --threshold=<threshold for binaryzation of logits> \     # 0.5 default
+       --strategy=<sampling strategy> \                         # target or mask
+       --seed=<seed for reproducibility> \                      # default no seed
+       --guidance_scale=<scale for classifier free guidance> \  # 0 default, no classifier free guidance
+       --target_column_name=<name of target column> \           # name of target column, in case of conditional generation
+       --device=<device to run on> \
+       --use_ema                                                # whether to use EMA diffusion model
+```
+
 # Citation
 ```
 @article{kinakh2024tabular,
