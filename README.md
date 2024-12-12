@@ -25,6 +25,12 @@ datasets while being significantly smaller in size.
 
 # Installation
 
+## Pip install from repository
+
+```bash
+pip install git+https://github.com/vkinakh/binary-diffusion-tabular.git
+````
+
 ## Local conda installation
 
 Conda environment was tested on Ubuntu 22.04 LTS and on Mac OS Sonoma 14.6 with M3 chip.
