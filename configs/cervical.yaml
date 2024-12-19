@@ -1,0 +1,72 @@
+data:
+  path_table: ./data/cervical_train.csv    # path to dataset in csv format
+  numerical_columns:
+    - Age
+    - Number of sexual partners
+    - First sexual intercourse
+    - Num of pregnancies
+    - Smokes
+    - Smokes (years)
+    - Smokes (packs/year)
+    - Hormonal Contraceptives
+    - Hormonal Contraceptives (years)
+    - IUD
+    - IUD (years)
+    - STDs
+    - STDs (number)
+    - STDs:condylomatosis
+    - STDs:cervical condylomatosis
+    - STDs:vaginal condylomatosis
+    - STDs:vulvo-perineal condylomatosis
+    - STDs:syphilis
+    - STDs:pelvic inflammatory disease
+    - STDs:genital herpes
+    - STDs:molluscum contagiosum
+    - STDs:AIDS
+    - STDs:HIV
+    - STDs:Hepatitis B
+    - STDs:HPV
+    - STDs: Number of diagnosis
+    - STDs: Time since first diagnosis
+    - STDs: Time since last diagnosis
+    - Dx:Cancer
+    - Dx:CIN
+    - Dx:HPV
+    - Dx
+    - Hinselmann
+    - Schiller
+    - Citology
+  categorical_columns: []            # all columns are numerical
+  columns_to_drop:
+    - STDs:cervical condylomatosis  # Constant value column (all zeros)
+    - STDs:AIDS                # keeping all columns
+  dropna: True                      # drop rows with missing values
+  fillna: False                     # don't fill missing values
+  target_column: Biopsy            # using Biopsy as target for prediction
+  split_feature_target: True        # needed for conditional generation
+  task: classification              # this is a classification task
+model:
+  dim: 256                          # same dimensionality as diabetes model
+  n_res_blocks: 3                   # same number of residual blocks
+diffusion:
+  schedule: quad                    # using quadratic schedule as in diabetes
+  n_timesteps: 1000                # same number of timesteps
+  target: two_way                  # using two-way prediction
+trainer:
+  train_num_steps: 500000          
+  log_every: 100
+  save_every: 10000
+  save_num_samples: 64
+  max_grad_norm:
+  gradient_accumulate_every: 1
+  ema_decay: 0.995
+  ema_update_every: 10
+  lr: 0.0001
+  opt_type: adam
+  opt_params:
+  batch_size: 256
+  dataloader_workers: 16
+  classifier_free_guidance: True
+  zero_token_probability: 0.1
+fine_tune_from:
+comment: cervical_CFG

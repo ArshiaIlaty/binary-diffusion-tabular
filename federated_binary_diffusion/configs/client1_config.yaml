@@ -1,0 +1,70 @@
+data:
+  path_table: ./data/client1_data.csv
+  numerical_columns:
+    - Age
+    - Number of sexual partners
+    - First sexual intercourse
+    - Num of pregnancies
+    - Smokes
+    - Smokes (years)
+    - Smokes (packs/year)
+    - Hormonal Contraceptives
+    - Hormonal Contraceptives (years)
+    - IUD
+    - IUD (years)
+    - STDs
+    - STDs (number)
+    - STDs:condylomatosis
+    - STDs:vaginal condylomatosis
+    - STDs:vulvo-perineal condylomatosis
+    - STDs:syphilis
+    - STDs:pelvic inflammatory disease
+    - STDs:genital herpes
+    - STDs:molluscum contagiosum
+    - STDs:HIV
+    - STDs:Hepatitis B
+    - STDs:HPV
+    - STDs: Number of diagnosis
+    - STDs: Time since first diagnosis
+    - STDs: Time since last diagnosis
+    - Dx:Cancer
+    - Dx:CIN
+    - Dx:HPV
+    - Dx
+    - Hinselmann
+    - Schiller
+    - Citology
+  categorical_columns: []
+  columns_to_drop:
+    - STDs:cervical condylomatosis
+    - STDs:AIDS
+  dropna: True
+  fillna: False
+  target_column: Biopsy
+  split_feature_target: True
+  task: classification
+model:
+  dim: 256
+  n_res_blocks: 3
+diffusion:
+  schedule: quad
+  n_timesteps: 1000
+  target: two_way
+trainer:
+  train_num_steps: 5000  # Reduced for quicker federated rounds
+  log_every: 100
+  save_every: 1000
+  save_num_samples: 64
+  max_grad_norm: 1.0
+  gradient_accumulate_every: 1
+  ema_decay: 0.995
+  ema_update_every: 10
+  lr: 0.0001
+  opt_type: adam
+  opt_params: {}
+  batch_size: 256
+  dataloader_workers: 8
+  classifier_free_guidance: True
+  zero_token_probability: 0.1
+results_folder: ./models/client1
+comment: cervical_client1
