@@ -1,0 +1,270 @@
+    1  touch test
+    2  ls -l
+    3  rm test 
+    4  exit
+    5  ls
+    6  conda install
+    7  conda install anaconda-navigator
+    8  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    9  chmod +x Miniconda3-latest-Linux-x86_64.sh
+   10  ./Miniconda3-latest-Linux-x86_64.sh
+   11  source ~/.bashrc
+   12  conda --version
+   13  curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+   14  conda --version
+   15  wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+   16  conda --version
+   17  exec bash -l
+   18  conda --version
+   19  exec zsh -l
+   20  curl -O https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+   21  exec zsh -l
+   22  exec bash -l
+   23  activate binary-diffusion-tabular/
+   24  conda list --envs
+   25  conda info --envs
+   26  conda activate binary-diffusion-tabular/
+   27  conda activate binary-diffusion-tabular
+   28  cp /tab-ddpm/data/cervical/train.csv /binary-diffusion-tabular/data/
+   29  ls /tab-ddpm/data/cervical/train.csv
+   30  ls
+   31  ls /tab-ddpm/data/cervical
+   32  ls /tab-ddpm/data
+   33  ls /tab-ddpm
+   34  cd tab-ddpm/
+   35  ls
+   36  ls /tab-ddpm/data/cervical
+   37  cd..
+   38  cd ..
+   39  cp ~/tab-ddpm/data/cervical/train.csv ~/binary-diffusion-tabular/data/
+   40  cp ~/tab-ddpm/data/cervical/cervical_test.csv ~/binary-diffusion-tabular/data/
+   41  mv ~/binary-diffusion-tabular/data/train.csv /binary-diffusion-tabular/data/cervical_train.csv
+   42  mv ~/binary-diffusion-tabular/data/train.csv ~/binary-diffusion-tabular/data/cervical_train.csv
+   43  cd binary-diffusion-tabular/
+   44  cd configs/
+   45  ls
+   46  cd ..
+   47  cd binary-diffusion-tabular/
+   48  python train.py -c='~/binary-diffusion-tabular/configs'
+   49  python train.py -c='~/binary-diffusion-tabular/configs/cervical.yaml'
+   50  cd configs/
+   51  ls
+   52  cd ..
+   53  ls
+   54  python train.py -c='configs/cervical.yaml'
+   55  nvidia-smi
+   56  cd binary-diffusion-tabular/
+   57  # Assuming you're in the directory containing binary-diffusion-tabular
+   58  mkdir federated_binary_diffusion
+   59  cd federated_binary_diffusion
+   60  mkdir -p configs data models/{client1,client2,global} results
+   61  ls
+   62  nano data_prep.py 
+   63  cd configs/
+   64  nano client1_config.yaml
+   65  nano client2_config.yaml
+   66  cd ..
+   67  nano federated_training.py
+   68  python data_prep.py
+   69  cd ..
+   70  cd data
+   71  ls
+   72  cd ..
+   73  cd federated_binary_diffusion/
+   74  ls
+   75  cd models/
+   76  ls
+   77  nano global
+   78  cd global/
+   79  ls
+   80  nano global.py
+   81  cd ..
+   82  cd client1
+   83  ls
+   84  cd ..
+   85  cd .
+   86  cd ..
+   87  nano dat
+   88  nano data_prep.py 
+   89  python data_prep.py
+   90  nano models/global/global.py 
+   91  nano utils.py
+   92  nano federated_training.py 
+   93  nano generate_synthetic_data.py
+   94  nano evaluate_synthetic.py
+   95  python federated_training.py
+   96  nano federated_training.py 
+   97  python federated_training.py
+   98  conda activate binary-diffusion-tabular
+   99  python federated_training.py
+  100  pip install matplotlib seaborn scikit-learn
+  101  # If you need more visualization packages
+  102  pip install plotly 
+  103  python federated_training.py
+  104  nano configs/client1_config.yaml 
+  105  nano configs/client2_config.yaml 
+  106  python federated_training.py
+  107  nano configs/client1_config.yaml 
+  108  nano configs/client2_config.yaml 
+  109  python federated_training.py
+  110  conda activate binary-diffusion-tabular/
+  111  conda info --envs
+  112  conda activate binary-diffusion-tabular/
+  113  conda activate /home/ailaty3088/binary-diffusion-tabular
+  114  conda activate /home/ailaty3088@id.sdsu.edu/miniconda3/envs/binary-diffusion-tabular
+  115  cd binary-diffusion-tabular/
+  116  nano checkNan.py
+  117  python checkNan.py 
+  118  python train.py -c='configs/cervical.yaml'
+  119  nano divisionbyZeroError.py
+  120  python divisionbyZeroError.py 
+  121  nano /configs/cervical.yaml
+  122  ls
+  123  cd configs/
+  124  ls
+  125  nano cervical.yaml cd
+  126  cd ..
+  127  python train.py -c='configs/cervical.yaml'
+  128  ls
+  129  cd binary-diffusion-backup/
+  130  ls
+  131  cd ..
+  132  git clone https://github.com/ArshiaIlaty/binary-diffusion-tabular.git binary-diffusion-fork
+  133  cp -r binary-diffusion-backup/* binary-diffusion-fork/ 
+  134  cd binary-diffusion-fork
+  135  git status
+  136  # Add all changes
+  137  git add .
+  138  # Create a detailed commit
+  139  git commit -m "Add comprehensive implementation:
+  140  - Add cervical cancer dataset support
+  141  - Modify configurations for new dataset
+  142  - Add federated learning implementation
+  143  - Include training results and experiments"
+  144  # Push to your fork
+  145  git push origin main
+  146  git status
+  147  git push origin main
+  148  cd
+  149  cp -r tab-ddpm/ tab-ddpm-backup/
+  150  git clone https://github.com/ArshiaIlaty/tab-ddpm.git tab-ddpm-fork
+  151  cp -r binary-diffusion-backup/* tab-ddpm-fork/ 
+  152  cd tab-ddpm-fork
+  153  git add . 
+  154  git commit -m "Add new dataset and solved some syntax errors”
+  155  git push origin main
+  156  ls
+  157  cp -r tab-ddpm/ tab-ddpm-backup/
+  158  git clone https://github.com/ArshiaIlaty/tab-ddpm.git tab-ddpm-fork
+  159  cp -r binary-diffusion-backup/* tab-ddpm-fork/ 
+  160  cd tab-ddpm-fork
+  161  git add . 
+  162  git commit -m "Add new dataset and solved some syntax errors”
+  163  git push origin main
+  164  ld
+  165  ls
+  166  cd ..
+  167  ls
+  168  cd ..
+  169  ls
+  170  rm -r tab-ddpm-fork/
+  171  rmdir tab-ddpm-fork/
+  172  rm -r tab-ddpm-fork/
+  173  ls
+  174  rm -rf tab-ddpm-fork/
+  175  ls
+  176  rm -rf tab-ddpm-backup/
+  177  cp -r tab-ddpm/ tab-ddpm-backup/
+  178  git clone https://github.com/ArshiaIlaty/tab-ddpm.git tab-ddpm-fork
+  179  cp -r tab-ddpm-backup/* tab-ddpm-fork/ 
+  180  cd tab-ddpm-fork
+  181  git add . 
+  182  git commit -m "Add new dataset and solved some syntax errors”
+  183  git push origin main
+  184  git status
+  185  git add . 
+  186  git commit -m "Add new dataset and solved some syntax errors”
+  187  aldja
+  188  git commit
+  189  git push origin main
+  190  cd ..
+  191  cd binary-diffusion-fork/
+  192  screen -S federated_training
+  193  cd binary-diffusion-fork/
+  194  cd federated_binary_diffusion/
+  195  ls
+  196  cd ..
+  197  ls
+  198  cd federated_binary_diffusion/
+  199  ls
+  200  nano federated_training.py 
+  201  conda activate binary-diffusion-tabular
+  202  screen -S federated_training
+  203  # Create a backup of your current working directory
+  204  cp -r binary-diffusion-tabular/ binary-diffusion-backup/
+  205  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088/binary-diffusion-tabular ~/Documents
+  206  ls
+  207  scp ailaty3088@datasciencelab-01.sdsu.edu:~/binary-diffusion-tabular ~/Documents
+  208  ls -ld /home/ailaty3088/binary-diffusion-tabular
+  209  realpath -s binary-diffusion-tabular
+  210  scp /home/ailaty3088@id.sdsu.edu/binary-diffusion-tabular ~/Documents
+  211  ls
+  212  # Format: scp -r username@server:remote_directory local_directory
+  213  scp -r ailaty3088@id.sdsu.edu:/home/ailaty3088@id.sdsu.edu/binary-diffusion-tabular ~/Documents/
+  214  git config --global user.name "ArshiaIlaty"
+  215  git config --global user.email "ilatyarshia@gmail.com"
+  216  git config --global credential.helper store
+  217  git config --global credential.helper cache
+  218  ls
+  219  cd tab-ddpm/
+  220  cd ..
+  221  cd binary-diffusion-fork/
+  222  conda activate binary-diffusion-tabular
+  223  # Run with screen for persistence
+  224  screen -S federated_training
+  225  cd binary-diffusion-fork/
+  226  ls
+  227  cd federated_binary_diffusion/
+  228  vim federated_training.py
+  229  sed -i 's/\t/    /g' federated_training.py
+  230  conda activate binary-diffusion-tabular
+  231  python federated_training.py -c='configs/cervical.yaml'
+  232  autopep8 --in-place --aggressive --aggressive federated_training.py
+  233  python federated_training.py -c='configs/cervical.yaml'
+  234  nano federated_training.py 
+  235  python federated_training.py -c='configs/cervical.yaml'
+  236  scp COS-CS-E051358:/home/ailaty3088/last_week_commands.txt .
+  237  ls
+  238  #!/bin/bash
+  239  # Save the last 7 days' commands to a file
+  240  output_file="last_7_days_commands.txt"
+  241  date_threshold=$(date -d '7 days ago' '+%F')
+  242  history | awk -v date="$date_threshold" '$2 >= date' > "$output_file"
+  243  echo "Commands from the last 7 days saved to $output_file"
+  244  cd 
+  245  ls
+  246  nano last_7_days_commands.txt 
+  247  realpath last_7_days_commands.txt
+  248  scp /home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  249  scp arshia3088@server.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  250  scp arshia3088@datasciencelab-01.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  251  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  252  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads
+  253  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088/last_7_days_commands.txt ~/Downloads/
+  254  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads
+  255  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  256  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088/last_7_days_commands.txt ~/Downloads/
+  257  ls
+  258  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088/last_7_days_commands.txt ~/Downloads
+  259  ls ~/last_7_days_commands.txt
+  260  scp "ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088@id.sdsu.edu/last_7_days_commands.txt" ~/Downloads/
+  261  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088\@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  262  # From COS-CS-E051358, copy to Downloads
+  263  scp "ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088/last_7_days_commands.txt" ~/Downloads/
+  264  pwd  # Check your home directory path
+  265  ls -l last_7_days_commands.txt  # Check if file exists
+  266  scp ailaty3088@datasciencelab-01.sdsu.edu:/home/ailaty3088\@id.sdsu.edu/last_7_days_commands.txt ~/Downloads/
+  267  scp ailaty3088@COS-CS-E051358:~/last_7_days_commands.txt ~/Downloads/
+  268  scp -r ailaty3088@COS-CS-E051358:~/last_7_days_commands.txt ~/Downloads/
+  269  scp -r ailaty3088@COS-CS-E051358:~/last_7_days_commands.txt ~/Downloads
+  270  history > command_history.txt

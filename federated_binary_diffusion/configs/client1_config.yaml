@@ -47,24 +47,55 @@ model:
   dim: 256
   n_res_blocks: 3
 diffusion:
-  schedule: quad
   n_timesteps: 1000
-  target: two_way
+  target: "two_way"
+  schedule: "linear"
 trainer:
-  train_num_steps: 5000  # Reduced for quicker federated rounds
-  log_every: 100
-  save_every: 1000
-  save_num_samples: 64
-  max_grad_norm: 1.0
+  batch_size: 32
+  learning_rate: 0.001
+  train_num_steps: 1000
   gradient_accumulate_every: 1
   ema_decay: 0.995
   ema_update_every: 10
-  lr: 0.0001
-  opt_type: adam
-  opt_params: {}
-  batch_size: 256
-  dataloader_workers: 8
+  save_every: 1000
+  log_every: 100
   classifier_free_guidance: True
   zero_token_probability: 0.1
+  opt_type: 'adam'
+
+federation:
+  client_id: client1
+  round_timeout: 600  # timeout in seconds
+
+wandb:
+  project: "federated-binary-diffusion"
+  entity: "ilatyarshia"
+  group: "federated-training"
+
 results_folder: ./models/client1
 comment: cervical_client1
+
+
+# diffusion:
+#   schedule: "quad"
+#   n_timesteps: 1000
+#   target: "two_way"
+#   beta_start: 0.0001
+#   beta_end: 0.02
+#   beta_schedule: "linear"
+# trainer:
+#   train_num_steps: 1000  # Reduced for quicker federated rounds
+#   log_every: 100
+#   save_every: 1000
+#   save_num_samples: 64
+#   max_grad_norm: 1.0
+#   gradient_accumulate_every: 1
+#   ema_decay: 0.995
+#   ema_update_every: 10
+#   lr: 0.0001
+#   opt_type: adam
+#   opt_params: {}
+#   batch_size: 128
+#   dataloader_workers: 4
+#   classifier_free_guidance: True
+#   zero_token_probability: 0.1

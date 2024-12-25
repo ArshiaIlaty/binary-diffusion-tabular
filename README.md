@@ -234,3 +234,184 @@ The table below presents the **Binary Diffusion** results across various dataset
   year={2024}
 }
 ```
+# Project Tree
+```
+binary-diffusion-fork
+├─ .git
+│  ├─ COMMIT_EDITMSG
+│  ├─ FETCH_HEAD
+│  ├─ HEAD
+│  ├─ branches
+│  ├─ config
+│  ├─ description
+│  ├─ hooks
+│  │  ├─ applypatch-msg.sample
+│  │  ├─ commit-msg.sample
+│  │  ├─ fsmonitor-watchman.sample
+│  │  ├─ post-update.sample
+│  │  ├─ pre-applypatch.sample
+│  │  ├─ pre-commit.sample
+│  │  ├─ pre-merge-commit.sample
+│  │  ├─ pre-push.sample
+│  │  ├─ pre-rebase.sample
+│  │  ├─ pre-receive.sample
+│  │  ├─ prepare-commit-msg.sample
+│  │  ├─ push-to-checkout.sample
+│  │  └─ update.sample
+│  ├─ index
+│  ├─ info
+│  │  └─ exclude
+│  ├─ logs
+│  │  ├─ HEAD
+│  │  └─ refs
+│  │     ├─ heads
+│  │     │  └─ main
+│  │     └─ remotes
+│  │        └─ origin
+│  │           ├─ HEAD
+│  │           └─ main
+│  ├─ objects
+│  │  ├─ 0c
+│  │  │  └─ c835ce3a73e8cc593e8be92c315875449cad3b
+│  │  ├─ 0d
+│  │  │  └─ 025cfbad30820e68efb04f4b339262e5e669fa
+│  │  ├─ 0f
+│  │  │  └─ 287626535fb343ee1f6e3f147ea6677584c23d
+│  │  ├─ 16
+│  │  │  └─ aec9cdb8ae807b4cd0a3c2fbbf7d21924f0aba
+│  │  ├─ 2a
+│  │  │  └─ cb4b401318b37586bd34429e643b107c6fcd73
+│  │  ├─ 2b
+│  │  │  └─ 553aaeb502e7b8677b3ffb8e03481d9ec165e3
+│  │  ├─ 3a
+│  │  │  └─ 6e2b2d2af19c6b9e2bfaa327a49138973f5e71
+│  │  ├─ 3c
+│  │  │  ├─ 43c4541009e454a1e7e2c13964a88f637ee19a
+│  │  │  └─ cc4c6554443b403e57a75dd238cc1ffcb0b454
+│  │  ├─ 46
+│  │  │  └─ 8909b87592940f64391506e73192f8722455f0
+│  │  ├─ 51
+│  │  │  └─ 8e169a74870093cbd82a1fc3b3c43b29754d64
+│  │  ├─ 57
+│  │  │  └─ 6f9c078a13f9ce28ffb51b4cb0308d9084d7f8
+│  │  ├─ 68
+│  │  │  └─ eae44c7af1eb3d43140c755f460010ba23e763
+│  │  ├─ 6b
+│  │  │  └─ e74c032dc101b633d88f966cddc9b8a7c7d053
+│  │  ├─ 73
+│  │  │  └─ bec7ca591752aebb5e940fb886d78525d823e7
+│  │  ├─ 7a
+│  │  │  └─ ff6b7ddb9e40317609008ff9bb3ab0440632a7
+│  │  ├─ 94
+│  │  │  └─ f51d54ca1e26532169ff1998666921058f0a42
+│  │  ├─ 98
+│  │  │  └─ 37e7f8c71d0a6c72d27c65cfd2865d4bc32067
+│  │  ├─ a3
+│  │  │  └─ cb6ea4798db486886d1cb2fc9976c397f3fc5b
+│  │  ├─ b4
+│  │  │  └─ b3cffb87c8ba5bea496858f8966d03127120a3
+│  │  ├─ bf
+│  │  │  └─ 00c5b45d4d9d7acbe86e99147ac005a64f34d8
+│  │  ├─ c1
+│  │  │  └─ 1c0569c98c6d54aa060898fb9c405d3863a705
+│  │  ├─ c8
+│  │  │  └─ beae82126f1f178b015ed2c313d94825d194de
+│  │  ├─ d1
+│  │  │  └─ 6e70c0946bd56e3a01957262fd97e6e4001ce7
+│  │  ├─ d7
+│  │  │  └─ 5a5e4cdfa826abbb9ff30b1e80a880cb082503
+│  │  ├─ e3
+│  │  │  └─ 053567e401fad82c413958c606795b711629d2
+│  │  ├─ e5
+│  │  │  └─ 6abb6303084744726ba895652e3b70c5c71a71
+│  │  ├─ ea
+│  │  │  └─ f17a5f8d5df05ce69467ce86119f968d096ba7
+│  │  ├─ f4
+│  │  │  └─ 8969f93da7ac152b105843e13e058fc4b4321e
+│  │  ├─ fa
+│  │  │  └─ 37bd46659b9fbb282fbaacc8c1af50fa0d6fa9
+│  │  ├─ info
+│  │  └─ pack
+│  │     ├─ pack-5d67c6c08c88b5504fd4aaffbfa0de24d18db20e.idx
+│  │     └─ pack-5d67c6c08c88b5504fd4aaffbfa0de24d18db20e.pack
+│  ├─ packed-refs
+│  └─ refs
+│     ├─ heads
+│     │  └─ main
+│     ├─ remotes
+│     │  └─ origin
+│     │     ├─ HEAD
+│     │     └─ main
+│     └─ tags
+├─ .gitignore
+├─ LICENSE
+├─ README.md
+├─ binary_diffusion_tabular
+│  ├─ __init__.py
+│  ├─ dataset.py
+│  ├─ diffusion.py
+│  ├─ model.py
+│  ├─ trainer.py
+│  ├─ transformation.py
+│  └─ utils.py
+├─ checkNan.py
+├─ command_history.txt
+├─ configs
+│  ├─ adult.yaml
+│  ├─ cervical.yaml
+│  ├─ diabetes.yaml
+│  ├─ heloc.yaml
+│  ├─ housing.yaml
+│  ├─ sick.yaml
+│  └─ travel.yaml
+├─ data
+│  ├─ adult.csv
+│  ├─ adult_test.csv
+│  ├─ adult_train.csv
+│  ├─ cervical.csv
+│  ├─ cervical_test.csv
+│  ├─ cervical_train.csv
+│  ├─ diabetes.csv
+│  ├─ diabetes_test.csv
+│  ├─ diabetes_train.csv
+│  ├─ heloc.csv
+│  ├─ heloc_test.csv
+│  ├─ heloc_train.csv
+│  ├─ housing.csv
+│  ├─ housing_test.csv
+│  ├─ housing_train.csv
+│  ├─ sick.csv
+│  ├─ sick_test.csv
+│  ├─ sick_train.csv
+│  ├─ travel.csv
+│  ├─ travel_test.csv
+│  └─ travel_train.csv
+├─ divisionbyZeroError.py
+├─ environment.yml
+├─ federated_binary_diffusion
+│  ├─ configs
+│  │  ├─ client1_config.yaml
+│  │  └─ client2_config.yaml
+│  ├─ data
+│  │  ├─ client1_data.csv
+│  │  └─ client2_data.csv
+│  ├─ data_prep.py
+│  ├─ evaluate_synthetic.py
+│  ├─ federated_training.py
+│  ├─ federated_training_scratch.py
+│  ├─ generate_synthetic_data.py
+│  ├─ models
+│  │  ├─ client1
+│  │  ├─ client2
+│  │  └─ global
+│  │     └─ global.py
+│  └─ utils.py
+├─ pyproject.toml
+├─ requirements.txt
+├─ sample.py
+├─ tests
+│  ├─ test_fixed_size_binary_table_transformation.py
+│  └─ test_model.py
+└─ train.py
+
+```
